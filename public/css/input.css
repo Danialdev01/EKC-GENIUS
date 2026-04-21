@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .ts-control {
+    border-radius: 12px !important;
+    border: 1px solid #E2E8F0 !important;
+    padding: 14px !important;
+    background-color: #F8FAFC !important;
+  }
+  .ts-control:focus {
+    border-color: #6366F1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+  }
+  .ts-dropdown {
+    border-radius: 12px !important;
+  }
+}
