@@ -40,45 +40,58 @@ if (isset($_POST['generate_recommendation'])) {
     $stmt->execute([$assessment_id, $currentMonth, $currentYear]);
     $studentsWithLowScores = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    $stmt = $pdo->prepare("
+        SELECT activity_name FROM activites 
+        WHERE activity_type = (SELECT assessment_title FROM assessments WHERE assessment_id = ?)
+        AND activity_status = 4
+    ");
+    $stmt->execute([$assessment_id]);
+    $existingActivities = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $existingActivitiesList = !empty($existingActivities) ? implode(", ", $existingActivities) : "None";
+    
     if (!empty($studentsWithLowScores)) {
         $studentNames = implode(", ", array_column($studentsWithLowScores, 'student_name'));
         
-        $prompt = "You are an educational specialist for special needs children. Based on the following assessment area that students are struggling with, provide 3-5 specific, practical, and actionable recommended activities/interventions to help improve their skills.
+        $prompt = "You are an educational specialist for special needs children. Based on the following assessment area that students are struggling with, suggest ONE specific, practical activity that will help them improve their skills.
 
 Assessment Area: {$assessment['assessment_title']}
 
 Students needing intervention: {$studentNames}
 
-Please provide the recommended activities in this exact format:
-💡 Recommended Activities:
-• [First activity]
-• [Second activity]
-• [Third activity]
-• [Fourth activity - if applicable]
-• [Fifth activity - if applicable]
+IMPORTANT: The following activities have already been generated for this assessment area. DO NOT suggest any of these activities again:
+{$existingActivitiesList}
 
-Keep each activity concise but specific. Focus on practical activities that can be done in a classroom setting.";
+Provide your response in this exact format:
+Activity Name: [A specific activity name that does not include 'Recommendation for:' - e.g., 'Public speaking with other students', 'Eye contact games', 'Active listening exercises', etc.]
+Activity Description: [A detailed description of the activity and its benefits for the student's improvement. Explain why this activity helps students improve in {$assessment['assessment_title']}.]
+
+Do NOT include 'Recommendation for:' in the activity name. The activity name should be a specific, actionable short name (3-7 words). Make sure this is DIFFERENT from the existing activities listed above.";
         
         $result = callAI($prompt, 'openai/gpt-4o-mini', $apiKey);
         
-        $recommendationsText = "No recommendations available.";
+        $activityName = "Activity";
+        $activityDescription = "No activity generated.";
+        
         if ($result['success']) {
-            if (preg_match('/💡 Recommended Activities:(.*?)(?=$|\Z)/s', $result['content'], $matches)) {
-                $recommendationsText = trim($matches[1]);
-            } else {
-                $recommendationsText = $result['content'];
+            $content = $result['content'];
+            
+            if (preg_match('/Activity Name:\s*(.+?)(?:\n|$)/i', $content, $nameMatch)) {
+                $activityName = trim($nameMatch[1]);
+            }
+            
+            if (preg_match('/Activity Description:\s*(.+)/i', $content, $descMatch)) {
+                $activityDescription = trim($descMatch[1]);
             }
         }
         
         $stmt = $pdo->prepare("
-            INSERT INTO activites (activity_name, activity_description, activity_type, activity_active_at, activity_status, activity_created_at, activity_updated_at)
-            VALUES (?, ?, ?, ?, 4, NOW(), NOW())
+            INSERT INTO activites (activity_name, activity_description, activity_type, activity_status, activity_created_at, activity_updated_at)
+            VALUES (?, ?, ?, 4, NOW(), NOW())
         ");
         $stmt->execute([
-            "Recommendation for: " . $assessment['assessment_title'],
-            $recommendationsText,
-            "learning",
-            null
+            $activityName,
+            $activityDescription,
+            $assessment['assessment_title']
         ]);
         
         $activityId = $pdo->lastInsertId();
@@ -143,7 +156,7 @@ $lowScoreStudents = array_filter($allStudents, function($s) {
 
 $stmt = $pdo->prepare("
     SELECT * FROM activites 
-    WHERE activity_name LIKE CONCAT('%', (SELECT assessment_title FROM assessments WHERE assessment_id = ?), '%')
+    WHERE activity_type = (SELECT assessment_title FROM assessments WHERE assessment_id = ?)
     AND activity_status = 4
     ORDER BY activity_created_at DESC
 ");
@@ -217,21 +230,22 @@ $paginatedActivities = array_slice($recommendations, $activityOffset, $perPage);
             </div>
         </div>
 
-        <div class="flex justify-end">
-            <form method="POST" onsubmit="return confirm('Generate AI recommendation for this assessment?');">
-                <button type="submit" name="generate_recommendation" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-inter font-medium px-5 py-2.5 rounded-xl transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    Generate AI Recommendation
-                </button>
-            </form>
-        </div>
+        <br>
 
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100">
-                <h2 class="font-poppins text-lg font-semibold text-slate-800">Students with Low Scores</h2>
-                <p class="text-sm text-slate-500">Students who scored below 2.5 for this assessment</p>
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                    <h2 class="font-poppins text-lg font-semibold text-slate-800">Students with Low Scores</h2>
+                    <p class="text-sm text-slate-500">Students who scored below 2.5 for this assessment</p>
+                </div>
+                <form method="POST" onsubmit="return confirm('Generate AI recommendation for this assessment?');">
+                    <button type="submit" name="generate_recommendation" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-inter font-medium px-5 py-2.5 rounded-xl transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Generate AI Recommendation
+                    </button>
+                </form>
             </div>
             
             <div class="p-4 border-b border-slate-100">
@@ -299,6 +313,8 @@ $paginatedActivities = array_slice($recommendations, $activityOffset, $perPage);
             <?php endif; ?>
         </div>
 
+        <br>
+
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100">
                 <h2 class="font-poppins text-lg font-semibold text-slate-800">Recommended Activities</h2>
@@ -311,7 +327,6 @@ $paginatedActivities = array_slice($recommendations, $activityOffset, $perPage);
                         <tr class="bg-slate-50 text-left">
                             <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Activity Name</th>
                             <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                            <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
                             <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Created</th>
                             <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                         </tr>
@@ -331,11 +346,6 @@ $paginatedActivities = array_slice($recommendations, $activityOffset, $perPage);
                             </td>
                             <td class="px-6 py-4">
                                 <span class="text-sm text-slate-600 line-clamp-2"><?= htmlspecialchars($a['activity_description']) ?></span>
-                            </td>
-                            <td class="px-6 py-4">
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                                    <?= htmlspecialchars($a['activity_type'] ?? 'Recommendation') ?>
-                                </span>
                             </td>
                             <td class="px-6 py-4 text-sm text-slate-500">
                                 <?= date('d M Y', strtotime($a['activity_created_at'])) ?>

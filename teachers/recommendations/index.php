@@ -182,14 +182,6 @@ $assessments = array_slice($assessments, $offset, $perPage);
                     <button type="submit" class="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors">Search</button>
                 </form>
             </div>
-            <form method="POST" class="flex gap-2">
-                <button type="submit" name="load_recommendations" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-inter font-medium px-5 py-2.5 rounded-xl transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    Load New Recommendation
-                </button>
-            </form>
         </div>
 
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -200,7 +192,6 @@ $assessments = array_slice($assessments, $offset, $perPage);
                             <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Assessment</th>
                             <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg Score</th>
                             <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Students Below 2.5</th>
-                            <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Activities Generated</th>
                             <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                         </tr>
                     </thead>
@@ -233,15 +224,6 @@ $assessments = array_slice($assessments, $offset, $perPage);
                                 <?php if ($a['low_score_count'] > 0): ?>
                                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
                                     <?= (int)$a['low_score_count'] ?> students
-                                </span>
-                                <?php else: ?>
-                                <span class="text-slate-400">—</span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="px-6 py-4">
-                                <?php if ($a['recommendation_count'] > 0): ?>
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                                    <?= (int)$a['recommendation_count'] ?> activities
                                 </span>
                                 <?php else: ?>
                                 <span class="text-slate-400">—</span>

@@ -1,4 +1,6 @@
 <?php
+require_once '../../backend/formulas.php';
+
 // ── Get student details ─────────────────────────────────────────────
 $studentId = $GLOBALS['studentId'] ?? null;
 
@@ -216,6 +218,45 @@ Keep each section concise and specific.";
 }
 
 $aiAnalysis = $existingAI ?? null;
+
+// ── Formula Calculations ─────────────────────────────────────────────────────────
+// Get historical monthly averages
+$monthlyAverages = getHistoricalMonthlyAverages($pdo, $studentId, 6);
+
+// Calculate average growth (Formula 7)
+$averageGrowth = calculateAverageGrowth($monthlyAverages);
+
+// Predictive scores (Formula 7)
+$predictedScore3 = predictFutureScore($avgScore, $averageGrowth, 3);
+$predictedScore6 = predictFutureScore($avgScore, $averageGrowth, 6);
+
+// Calculate trend (Formula 5)
+$currentMonthIdx = 0;
+$previousMonthIdx = 1;
+$trend = null;
+if (isset($monthlyAverages[$currentMonthIdx]['avg']) && isset($monthlyAverages[$previousMonthIdx]['avg'])) {
+    $trend = calculateTrend($monthlyAverages[$currentMonthIdx]['avg'], $monthlyAverages[$previousMonthIdx]['avg']);
+}
+
+// Calculate growth rate if we have enough data (Formula 4)
+$growthRate = null;
+if (count($monthlyAverages) >= 2 && $monthlyAverages[count($monthlyAverages)-1]['avg'] && $monthlyAverages[0]['avg']) {
+    $growthRate = calculateGrowthRate($monthlyAverages[count($monthlyAverages)-1]['avg'], $monthlyAverages[0]['avg']);
+}
+
+// Annual development index (Formula 2)
+$annualIndex = calculateAnnualIndex(array_column($monthlyAverages, 'avg'));
+
+// Weak areas (Formula 3)
+$weakAreas = detectWeakAreas($scores, 2.5);
+$weakAreaNames = [];
+foreach ($assessmentsList as $a) {
+    if (in_array($a['assessment_id'], $weakAreas)) {
+        $weakAreaNames[] = $a['assessment_title'];
+    }
+}
+
+$scoreInterpretation = getScoreInterpretation($avgScore);
 ?>
 
 <!-- Student Profile Header -->
@@ -293,7 +334,7 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
 </div>
 
 <!-- Stats Cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
     <!-- Development Score -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <div class="flex items-center gap-3 mb-3">
@@ -304,10 +345,30 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
         <p class="font-poppins text-3xl font-bold text-slate-800">
             <?= $avgScore ?><span class="text-lg text-slate-400">/5</span>
         </p>
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold <?= $scoreInterpretation['class'] ?> mt-1">
+            <?= $scoreInterpretation['emoji'] ?> <?= $scoreInterpretation['label'] ?>
+        </span>
         <p class="text-xs text-slate-400 mt-1">Current Month (<?= date('F Y') ?>)</p>
         <?php else: ?>
         <p class="font-poppins text-2xl text-slate-400">—</p>
         <p class="text-xs text-slate-400 mt-1">No assessments yet</p>
+        <?php endif; ?>
+    </div>
+
+    <!-- Annual Development Index -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-xl">📈</div>
+            <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Annual Index</p>
+        </div>
+        <?php if ($annualIndex): ?>
+        <p class="font-poppins text-3xl font-bold text-slate-800">
+            <?= $annualIndex ?><span class="text-lg text-slate-400">/5</span>
+        </p>
+        <p class="text-xs text-slate-400 mt-1">Avg over 6 months</p>
+        <?php else: ?>
+        <p class="font-poppins text-2xl text-slate-400">—</p>
+        <p class="text-xs text-slate-400 mt-1">Insufficient data</p>
         <?php endif; ?>
     </div>
 
@@ -325,22 +386,26 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
         <?php endif; ?>
     </div>
 
-    <!-- Strengths -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+    <!-- Weak Areas -->
+    <div class="bg-white rounded-2xl border <?= empty($weakAreaNames) ? 'border-slate-200' : 'border-red-200' ?> shadow-sm p-5">
         <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-xl bg-growth-50 flex items-center justify-center text-xl">⭐</div>
-            <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Strengths</p>
+            <div class="w-10 h-10 rounded-xl <?= empty($weakAreaNames) ? 'bg-slate-100' : 'bg-red-50' ?> flex items-center justify-center text-xl">
+                <?= empty($weakAreaNames) ? '✅' : '⚠️' ?>
+            </div>
+            <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Needs Attention</p>
         </div>
-        <?php if (!empty($strengths)): ?>
+        <?php if (!empty($weakAreaNames)): ?>
         <div class="flex flex-wrap gap-1.5">
-            <?php foreach ($strengths as $s): ?>
-            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                <?= htmlspecialchars($s) ?>
+            <?php foreach (array_slice($weakAreaNames, 3) as $w): ?>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                <?= htmlspecialchars($w) ?>
             </span>
             <?php endforeach; ?>
         </div>
+        <p class="text-xs text-red-500 mt-1">Score below 2.5</p>
         <?php else: ?>
-        <p class="text-sm text-slate-400">No strengths identified yet</p>
+        <p class="text-sm text-emerald-600">All areas healthy</p>
+        <p class="text-xs text-slate-400 mt-1">No weak areas detected</p>
         <?php endif; ?>
     </div>
 </div>
@@ -400,18 +465,34 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="p-4 bg-slate-50 rounded-xl">
             <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Predicted Score (3 months)</p>
-            <p class="font-poppins text-2xl font-bold text-slate-800">3.4</p>
-            <p class="text-xs text-emerald-600">Expected +0.00 improvement</p>
+            <p class="font-poppins text-2xl font-bold text-slate-800"><?= $predictedScore3 ?? '—' ?><span class="text-sm text-slate-400">/5</span></p>
+            <?php if ($averageGrowth !== null): ?>
+            <p class="text-xs <?= $averageGrowth >= 0 ? 'text-emerald-600' : 'text-red-500' ?>">
+                <?= $averageGrowth >= 0 ? '+' : '' ?><?= $averageGrowth ?> avg monthly growth
+            </p>
+            <?php else: ?>
+            <p class="text-xs text-slate-400">Insufficient data</p>
+            <?php endif; ?>
         </div>
         <div class="p-4 bg-slate-50 rounded-xl">
             <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Predicted Score (6 months)</p>
-            <p class="font-poppins text-2xl font-bold text-slate-800">3.4</p>
-            <p class="text-xs text-emerald-600">Projected +0.00 growth</p>
+            <p class="font-poppins text-2xl font-bold text-slate-800"><?= $predictedScore6 ?? '—' ?><span class="text-sm text-slate-400">/5</span></p>
+            <?php if ($growthRate !== null): ?>
+            <p class="text-xs <?= $growthRate >= 0 ? 'text-emerald-600' : 'text-red-500' ?>">
+                <?= $growthRate >= 0 ? '+' : '' ?><?= $growthRate ?>% annual growth
+            </p>
+            <?php else: ?>
+            <p class="text-xs text-slate-400">Need more data</p>
+            <?php endif; ?>
         </div>
         <div class="p-4 bg-slate-50 rounded-xl">
-            <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Development Trajectory</p>
-            <p class="font-poppins text-2xl font-bold text-slate-800">➡️ Stable</p>
-            <p class="text-xs text-slate-500">Maintaining current level</p>
+            <p class="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Development Trend</p>
+            <?php if ($trend): ?>
+            <p class="font-poppins text-2xl font-bold <?= $trend['class'] ?>"><?= $trend['icon'] ?> <?= $trend['label'] ?></p>
+            <?php else: ?>
+            <p class="font-poppins text-2xl font-bold text-slate-400">—</p>
+            <?php endif; ?>
+            <p class="text-xs text-slate-400">Based on monthly data</p>
         </div>
     </div>
 </div>

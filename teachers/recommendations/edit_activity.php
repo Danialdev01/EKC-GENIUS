@@ -2,6 +2,7 @@
 session_start();
 require_once '../../config/connect.php';
 require_once '../../backend/auth.php';
+require_once '../../backend/ai.php';
 
 $authUser = requireAuth('teacher');
 $pageTitle = 'Convert to Activity';
@@ -51,6 +52,68 @@ $stmt->execute([$activity_id]);
 $existingAssignedIds = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'student_id');
 
 $preSelectedStudents = array_unique(array_merge($defaultStudentIds, $existingAssignedIds));
+
+if ($activity['activity_name'] === 'Activity' || $activity['activity_description'] === 'No activity generated.') {
+    $apiKey = getenv('OPENROUTER_API_KEY') ?: $_ENV['OPENROUTER_API_KEY'] ?? '';
+    
+    if ($apiKey) {
+        $studentNames = '';
+        if (!empty($preSelectedStudents)) {
+            $placeholders = implode(',', array_fill(0, count($preSelectedStudents), '?'));
+            $stmt = $pdo->prepare("SELECT student_name FROM students WHERE student_id IN ($placeholders) AND student_status = 1");
+            $stmt->execute(array_values($preSelectedStudents));
+            $studentNamesList = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'student_name');
+            $studentNames = implode(", ", $studentNamesList);
+        }
+        
+        $stmt = $pdo->prepare("
+            SELECT activity_name FROM activites 
+            WHERE activity_type = ? AND activity_status = 4
+        ");
+        $stmt->execute([$assessment['assessment_title']]);
+        $existingActivities = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $existingActivitiesList = !empty($existingActivities) ? implode(", ", $existingActivities) : "None";
+        
+        $prompt = "You are an educational specialist for special needs children. Based on the following assessment area that students are struggling with, suggest ONE specific, practical activity that will help them improve their skills.
+
+Assessment Area: {$assessment['assessment_title']}
+
+Students needing intervention: {$studentNames}
+
+IMPORTANT: The following activities have already been generated for this assessment area. DO NOT suggest any of these activities again:
+{$existingActivitiesList}
+
+Provide your response in this exact format:
+Activity Name: [A specific activity name that does not include 'Recommendation for:' - e.g., 'Public speaking with other students', 'Eye contact games', 'Active listening exercises', etc.]
+Activity Description: [A detailed description of the activity and its benefits for the student's improvement. Explain why this activity helps students improve in {$assessment['assessment_title']}.]
+
+Do NOT include 'Recommendation for:' in the activity name. The activity name should be a specific, actionable short name (3-7 words). Make sure this is DIFFERENT from the existing activities listed above.";
+        
+        $result = callAI($prompt, 'openai/gpt-4o-mini', $apiKey);
+        
+        if ($result['success']) {
+            $content = $result['content'];
+            $newActivityName = $activity['activity_name'];
+            $newActivityDescription = $activity['activity_description'];
+            
+            if (preg_match('/Activity Name:\s*(.+?)(?:\n|$)/i', $content, $nameMatch)) {
+                $newActivityName = trim($nameMatch[1]);
+            }
+            
+            if (preg_match('/Activity Description:\s*(.+)/i', $content, $descMatch)) {
+                $newActivityDescription = trim($descMatch[1]);
+            }
+            
+            if ($newActivityName !== 'Activity' && $newActivityDescription !== 'No activity generated.') {
+                $stmt = $pdo->prepare("UPDATE activites SET activity_name = ?, activity_description = ? WHERE activity_id = ?");
+                $stmt->execute([$newActivityName, $newActivityDescription, $activity_id]);
+                
+                $activity['activity_name'] = $newActivityName;
+                $activity['activity_description'] = $newActivityDescription;
+            }
+        }
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['convert_activity'])) {
     $activity_name = trim($_POST['activity_name'] ?? '');
@@ -291,8 +354,12 @@ function loadStudents(page = 1) {
     const url = new URL(window.location.href);
     url.searchParams.set('ajax', '1');
     url.searchParams.set('page', page);
-    url.searchParams.set('search', currentSearch);
-    url.searchParams.set('category', currentCategory);
+    if (currentSearch) {
+        url.searchParams.set('search', currentSearch);
+    }
+    if (currentCategory) {
+        url.searchParams.set('category', currentCategory);
+    }
     
     const activityDate = document.getElementById('activityDate').value;
     if (activityDate) {
@@ -300,10 +367,18 @@ function loadStudents(page = 1) {
     }
     
     fetch(url.toString())
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error('Network response was not ok');
+            return res.json();
+        })
         .then(data => {
             renderTable(data.students, data.conflicting_students);
             renderPagination(data);
+        })
+        .catch(err => {
+            console.error('Error loading students:', err);
+            const tbody = document.getElementById('studentsTableBody');
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-red-500">Error loading students: ' + err.message + '</td></tr>';
         });
 }
 
@@ -413,7 +488,9 @@ document.getElementById('activityDate').addEventListener('change', function() {
     loadStudents(1);
 });
 
-loadStudents(1);
+const urlParams = new URLSearchParams(window.location.search);
+const initialPage = parseInt(urlParams.get('page')) || 1;
+loadStudents(initialPage);
 </script>
 
 </body>

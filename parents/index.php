@@ -2,6 +2,8 @@
 session_start();
 require_once '../config/connect.php';
 require_once '../backend/auth.php';
+require_once '../backend/formulas.php';
+
 $authUser  = requireAuth('parent');   // student_id stored as user_id for parents
 $pageTitle = 'My Child\'s Progress';
 $cssDepth  = '../public/css';
@@ -70,6 +72,25 @@ $stmt->execute([$studentId]);
 $attendances = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $attendanceTypes = [1 => 'Present', 2 => 'Absent', 3 => 'Late'];
 $attendanceColors = [1 => 'emerald', 2 => 'red', 3 => 'amber'];
+
+// ── Formula Calculations ───────────────────────────────────────────────
+$monthlyAverages = getHistoricalMonthlyAverages($pdo, $studentId, 6);
+$averageGrowth = calculateAverageGrowth($monthlyAverages);
+$scoreInterpretation = getScoreInterpretation($avgScore);
+
+// Predictive scores
+$predictedScore3 = predictFutureScore($avgScore, $averageGrowth, 3);
+$predictedScore6 = predictFutureScore($avgScore, $averageGrowth, 6);
+
+// Annual index
+$annualIndex = calculateAnnualIndex(array_column($monthlyAverages, 'avg'));
+
+// Weak areas detection
+$currentScores = [];
+foreach ($assessments as $a) {
+    $currentScores[$a['assessment_title']] = $a['student_assessment_value'];
+}
+$weakAreasList = detectWeakAreas(array_column($currentScores, null, null) ?? [], 2.5);
 ?>
 <?php include '../components/teacher/header.php'; ?>
 
@@ -178,20 +199,25 @@ $attendanceColors = [1 => 'emerald', 2 => 'red', 3 => 'amber'];
                     <p class="font-poppins text-2xl font-bold text-slate-800">
                         <?= $avgScore !== null ? number_format($avgScore, 1) . '<span class="text-sm text-slate-400">/5</span>' : '—' ?>
                     </p>
+                    <?php if ($scoreInterpretation): ?>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium <?= $scoreInterpretation['class'] ?>">
+                        <?= $scoreInterpretation['emoji'] ?>
+                    </span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-2xl shrink-0">📝</div>
+                <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl shrink-0">📈</div>
                 <div>
-                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Assessments</p>
-                    <p class="font-poppins text-2xl font-bold text-slate-800"><?= count($assessments) ?></p>
+                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Annual Index</p>
+                    <p class="font-poppins text-2xl font-bold text-slate-800"><?= $annualIndex !== null ? number_format($annualIndex, 1) : '—' ?></p>
                 </div>
             </div>
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-2xl shrink-0">📅</div>
+                <div class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-2xl shrink-0">🎯</div>
                 <div>
-                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Attendance</p>
-                    <p class="font-poppins text-2xl font-bold text-slate-800"><?= count($attendances) ?> <span class="text-sm text-slate-400">records</span></p>
+                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Predicted (3mo)</p>
+                    <p class="font-poppins text-2xl font-bold text-slate-800"><?= $predictedScore3 ?? '—' ?></p>
                 </div>
             </div>
             <div class="bg-white rounded-2xl border <?= $isAtRisk ? 'border-red-200' : 'border-emerald-200' ?> shadow-sm p-5 flex items-center gap-4">

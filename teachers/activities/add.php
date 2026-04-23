@@ -13,7 +13,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_activity'])) {
     $activity_name = trim($_POST['activity_name'] ?? '');
     $activity_description = trim($_POST['activity_description'] ?? '');
     $activity_type = trim($_POST['activity_type'] ?? '');
-    $activity_active_at = $_POST['activity_active_at'] ?? null;
+    $activity_active_at = null;
+    if (!empty($_POST['activity_active_date']) && !empty($_POST['activity_active_time'])) {
+        $activity_active_at = $_POST['activity_active_date'] . ' ' . $_POST['activity_active_time'];
+    }
     $selected_students = $_POST['students'] ?? [];
     
     if (!empty($activity_name) && !empty($activity_description)) {
@@ -152,8 +155,11 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
                 </div>
                 
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Active Date</label>
-                    <input type="datetime-local" name="activity_active_at" id="activityDate" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Active Date *</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="date" name="activity_active_date" id="activityActiveDate" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                        <input type="time" name="activity_active_time" id="activityActiveTime" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                    </div>
                 </div>
                 
                 <div>
@@ -231,9 +237,10 @@ function loadStudents(page = 1) {
     url.searchParams.set('search', currentSearch);
     url.searchParams.set('category', currentCategory);
     
-    const activityDate = document.getElementById('activityDate').value;
-    if (activityDate) {
-        url.searchParams.set('activity_date', activityDate);
+    const activityDate = document.getElementById('activityActiveDate').value;
+    const activityTime = document.getElementById('activityActiveTime').value;
+    if (activityDate && activityTime) {
+        url.searchParams.set('activity_date', activityDate + ' ' + activityTime);
     }
     
     fetch(url.toString())
@@ -342,7 +349,11 @@ document.getElementById('categoryFilter').addEventListener('change', function(e)
     loadStudents(1);
 });
 
-document.getElementById('activityDate').addEventListener('change', function() {
+document.getElementById('activityActiveDate').addEventListener('change', function() {
+    loadStudents(1);
+});
+
+document.getElementById('activityActiveTime').addEventListener('change', function() {
     loadStudents(1);
 });
 
