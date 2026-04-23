@@ -141,6 +141,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['convert_activity'])) 
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_activity'])) {
+    $stmt = $pdo->prepare("UPDATE activites SET activity_status = 0, activity_updated_at = NOW() WHERE activity_id = ?");
+    $stmt->execute([$activity_id]);
+    
+    header('Location: view.php?assessment_id=' . (int)$assessment_id . '&deleted=1');
+    exit;
+}
+
 $search = trim($_GET['search'] ?? '');
 $category_filter = $_GET['category'] ?? '';
 $page = (int)($_GET['page'] ?? 1);
@@ -331,6 +339,9 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-inter font-medium px-6 py-3 rounded-xl transition-colors">
                         Convert to Activity
                     </button>
+                    <button type="button" onclick="deleteActivity()" class="bg-red-600 hover:bg-red-700 text-white font-inter font-medium px-6 py-3 rounded-xl transition-colors">
+                        Delete
+                    </button>
                     <a href="view.php?assessment_id=<?= (int)$assessment_id ?>" class="px-6 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
                         Cancel
                     </a>
@@ -487,6 +498,25 @@ document.getElementById('categoryFilter').addEventListener('change', function(e)
 document.getElementById('activityDate').addEventListener('change', function() {
     loadStudents(1);
 });
+
+function deleteActivity() {
+    if (!confirm('Are you sure you want to delete this recommended activity? This action cannot be undone.')) {
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'edit_activity.php?activity_id=<?= (int)$activity_id ?>&assessment_id=<?= (int)$assessment_id ?>';
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'delete_activity';
+    input.value = '1';
+    form.appendChild(input);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
 
 const urlParams = new URLSearchParams(window.location.search);
 const initialPage = parseInt(urlParams.get('page')) || 1;

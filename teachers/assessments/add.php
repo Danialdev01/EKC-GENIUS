@@ -48,84 +48,7 @@ $existingScores = [];
 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $existingScores[$row['assessment_id']] = $row['student_assessment_value'];
 }
-?>
-<?php include '../../components/teacher/header.php'; ?>
 
-<?php include '../../components/teacher/sidebar.php'; ?>
-
-<main class="lg:ml-64 min-h-screen flex flex-col">
-    <header class="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30 shrink-0">
-        <div class="flex items-center gap-4">
-            <button onclick="toggleTeacherSidebar()" class="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-            </button>
-            <div>
-                <h1 class="font-poppins text-xl font-semibold text-slate-800">Add Assessment</h1>
-                <p class="text-xs text-slate-400 hidden sm:block"><?= $months[$currentMonth] ?> <?= $currentYear ?></p>
-            </div>
-        </div>
-    </header>
-
-    <div class="flex-1 p-4 lg:p-8 space-y-6">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold">
-                        <?= strtoupper(substr($student['student_name'], 0, 1)) ?>
-                    </div>
-                    <div>
-                        <h2 class="font-poppins text-lg font-semibold text-slate-800"><?= htmlspecialchars($student['student_name']) ?></h2>
-                        <p class="text-xs text-slate-400"><?= $months[$currentMonth] ?> <?= $currentYear ?></p>
-                    </div>
-                </div>
-                <a href="../../teachers/students/?id=<?= (int)$studentId ?>" class="text-sm text-slate-500 hover:text-slate-700">← Back</a>
-            </div>
-
-            <form method="post" class="p-6">
-                <input type="hidden" name="student_id" value="<?= (int)$student['student_id'] ?>">
-                <input type="hidden" name="assessment_month" value="<?= $currentMonth ?>">
-                <input type="hidden" name="assessment_year" value="<?= $currentYear ?>">
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <?php foreach ($assessmentsList as $a): ?>
-                    <div class="bg-slate-50 rounded-xl p-4">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="text-xl"><?= htmlspecialchars($a['assessment_icon']) ?></span>
-                            <h3 class="font-poppins text-sm font-semibold text-slate-800"><?= htmlspecialchars($a['assessment_title']) ?></h3>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <?php for ($i = 1; $i <= 5; $i++): ?>
-                            <label class="flex-1 cursor-pointer">
-                                <input type="radio" name="scores[<?= (int)$a['assessment_id'] ?>]" value="<?= $i ?>" 
-                                    <?= isset($existingScores[$a['assessment_id']]) && $existingScores[$a['assessment_id']] == $i ? 'checked' : '' ?>
-                                    class="peer sr-only">
-                                <div class="text-center py-2 rounded-lg text-sm font-medium bg-white border border-slate-200 text-slate-600 peer-checked:bg-indigo-500 peer-checked:text-white peer-checked:border-indigo-500 transition-colors">
-                                    <?= $i ?>
-                                </div>
-                            </label>
-                            <?php endfor; ?>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-
-                <div class="mt-6 flex gap-3">
-                    <button type="submit" name="save_assessment" class="bg-indigo-600 hover:bg-indigo-700 text-white font-inter font-medium px-6 py-3 rounded-xl transition-colors">
-                        Save Assessment
-                    </button>
-                    <button type="submit" name="save_and_next" class="bg-emerald-600 hover:bg-emerald-700 text-white font-inter font-medium px-6 py-3 rounded-xl transition-colors">
-                        Save and Next Student
-                    </button>
-                    <a href="../../teachers/students/?id=<?= (int)$studentId ?>" class="px-6 py-3 rounded-xl text-slate-600 hover:bg-slate-100">Cancel</a>
-                </div>
-            </form>
-        </div>
-    </div>
-</main>
-
-<?php
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_assessment']) || isset($_POST['save_and_next']))) {
     $studentId = $_POST['student_id'] ?? null;
     $month = $_POST['assessment_month'] ?? null;
@@ -143,7 +66,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_assessment']) |
             }
         }
 
-        // Update AI assessment
         $apiKey = getenv('OPENROUTER_API_KEY') ?: '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';
         
         $stmt = $pdo->query("SELECT * FROM assessments WHERE assessment_status = 1 ORDER BY assessment_title");
@@ -215,7 +137,6 @@ Keep each section concise and specific.";
             }
         }
         
-        // Delete existing AI assessment for this month/year and insert new one
         $stmt = $pdo->prepare("UPDATE ai_assessments SET ai_assessment_status = 0 WHERE student_id = ? AND ai_assessment_month = ? AND ai_assessment_year = ?");
         $stmt->execute([$studentId, $month, $year]);
         
@@ -244,13 +165,104 @@ Keep each section concise and specific.";
             $nextStudent = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($nextStudent) {
-                echo "<script>alert('Assessment saved!'); window.location.href = '?student_id=" . $nextStudent['student_id'] . "&month=$month&year=$year';</script>";
+                $_SESSION['success'] = 'Assessment saved!';
+                header('Location: ?student_id=' . $nextStudent['student_id'] . '&month=' . $month . '&year=' . $year);
+                exit;
             } else {
-                echo "<script>alert('Assessment saved! No more students to assess.'); window.location.href = '../../teachers/students/?id=$studentId';</script>";
+                $_SESSION['success'] = 'Assessment saved! No more students to assess.';
+                header('Location: ../../teachers/students/?id=' . $studentId);
+                exit;
             }
         } else {
-            echo "<script>alert('Assessment saved successfully!'); window.location.href = '../../teachers/students/?id=$studentId';</script>";
+            $_SESSION['success'] = 'Assessment saved successfully!';
+            header('Location: ../../teachers/students/?id=' . $studentId);
+            exit;
         }
     }
 }
 ?>
+<?php include '../../components/teacher/header.php'; ?>
+
+<?php include '../../components/teacher/sidebar.php'; ?>
+
+<main class="lg:ml-64 min-h-screen flex flex-col">
+    <header class="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30 shrink-0">
+        <div class="flex items-center gap-4">
+            <button onclick="toggleTeacherSidebar()" class="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+            <div>
+                <h1 class="font-poppins text-xl font-semibold text-slate-800">Add Assessment</h1>
+                <p class="text-xs text-slate-400 hidden sm:block"><?= $months[$currentMonth] ?> <?= $currentYear ?></p>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 p-4 lg:p-8 space-y-6">
+        <?php if (isset($_SESSION['success'])): ?>
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <?= htmlspecialchars($_SESSION['success']) ?>
+        </div>
+        <?php unset($_SESSION['success']); endif; ?>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold">
+                        <?= strtoupper(substr($student['student_name'], 0, 1)) ?>
+                    </div>
+                    <div>
+                        <h2 class="font-poppins text-lg font-semibold text-slate-800"><?= htmlspecialchars($student['student_name']) ?></h2>
+                        <p class="text-xs text-slate-400"><?= $months[$currentMonth] ?> <?= $currentYear ?></p>
+                    </div>
+                </div>
+                <a href="../../teachers/students/?id=<?= (int)$studentId ?>" class="text-sm text-slate-500 hover:text-slate-700">← Back</a>
+            </div>
+
+            <form method="post" class="p-6">
+                <input type="hidden" name="student_id" value="<?= (int)$student['student_id'] ?>">
+                <input type="hidden" name="assessment_month" value="<?= $currentMonth ?>">
+                <input type="hidden" name="assessment_year" value="<?= $currentYear ?>">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <?php foreach ($assessmentsList as $a): ?>
+                    <div class="bg-slate-50 rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-xl"><?= htmlspecialchars($a['assessment_icon']) ?></span>
+                            <h3 class="font-poppins text-sm font-semibold text-slate-800"><?= htmlspecialchars($a['assessment_title']) ?></h3>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <?php for ($i = 1; $i <= 5; $i++): ?>
+                            <label class="flex-1 cursor-pointer">
+                                <input type="radio" name="scores[<?= (int)$a['assessment_id'] ?>]" value="<?= $i ?>" 
+                                    <?= isset($existingScores[$a['assessment_id']]) && $existingScores[$a['assessment_id']] == $i ? 'checked' : '' ?>
+                                    class="peer sr-only">
+                                <div class="text-center py-2 rounded-lg text-sm font-medium bg-white border border-slate-200 text-slate-600 peer-checked:bg-indigo-500 peer-checked:text-white peer-checked:border-indigo-500 transition-colors">
+                                    <?= $i ?>
+                                </div>
+                            </label>
+                            <?php endfor; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="mt-6 flex gap-3">
+                    <button type="submit" name="save_assessment" class="bg-indigo-600 hover:bg-indigo-700 text-white font-inter font-medium px-6 py-3 rounded-xl transition-colors">
+                        Save Assessment
+                    </button>
+                    <button type="submit" name="save_and_next" class="bg-emerald-600 hover:bg-emerald-700 text-white font-inter font-medium px-6 py-3 rounded-xl transition-colors">
+                        Save and Next Student
+                    </button>
+                    <a href="../../teachers/students/?id=<?= (int)$studentId ?>" class="px-6 py-3 rounded-xl text-slate-600 hover:bg-slate-100">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>
