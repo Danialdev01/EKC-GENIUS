@@ -239,10 +239,10 @@ $attendanceRate = $totalDays > 0 ? round(($present / $totalDays) * 100, 1) : 0;
                             <p class="text-slate-600 text-xs leading-relaxed"><?= htmlspecialchars($ai['ai_assessment_strengths']) ?></p>
                         </div>
                         <?php endif; ?>
-                        <?php if ($ai['ai_assessment_focus_areas']): ?>
+                        <?php if (isset($ai['ai_assessment_focus_area']) && $ai['ai_assessment_focus_area']): ?>
                         <div class="bg-white/70 rounded-xl p-4">
                             <p class="font-semibold text-amber-700 mb-2 flex items-center gap-1">🎯 Focus Areas</p>
-                            <p class="text-slate-600 text-xs leading-relaxed"><?= htmlspecialchars($ai['ai_assessment_focus_areas']) ?></p>
+                            <p class="text-slate-600 text-xs leading-relaxed"><?= htmlspecialchars($ai['ai_assessment_focus_area']) ?></p>
                         </div>
                         <?php endif; ?>
                         <?php if ($ai['ai_assessment_trend_analysis']): ?>

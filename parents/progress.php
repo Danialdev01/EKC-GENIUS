@@ -179,6 +179,7 @@ $attendanceColors = [1 => 'emerald', 2 => 'red', 3 => 'amber'];
                     <tbody class="divide-y divide-slate-100">
                         <?php foreach ($monthlyAverages as $data): 
                             $val = $data['avg'];
+                            if ($val === null) continue;
                             $pct = ($val / 5) * 100;
                             $color = $val >= 4 ? 'bg-emerald-500' : ($val >= 3 ? 'bg-amber-400' : 'bg-red-500');
                             $statusClass = $val >= 4 ? 'text-emerald-600' : ($val >= 3 ? 'text-amber-600' : 'text-red-500');

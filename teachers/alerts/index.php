@@ -56,29 +56,34 @@ foreach ($needAttentionStudents as $student) {
     }
 }
 
-// Generate alerts for students who need them
-foreach ($studentsNeedingAlerts as $student) {
-    $studentId = $student['student_id'];
-    $weakAreas = getStudentWeakAreas($pdo, $studentId, $currentMonth, $currentYear);
-    $recommendations = getAIRecommendations($student['student_name'], $weakAreas, $apiKey);
-    
-    // Extract recommended actions (after "💡 Recommended Actions:")
-    $recommendedAction = "";
-    $recommendedActivity = "";
-    
-    if (preg_match('/💡 Recommended Actions:(.*?)(?=$|\n\n|\Z)/s', $recommendations, $matches)) {
-        $recommendedAction = trim($matches[1]);
+// Generate alerts only when "Check Students" button is clicked
+if (isset($_GET['check']) && $_GET['check'] == '1') {
+    foreach ($studentsNeedingAlerts as $student) {
+        $studentId = $student['student_id'];
+        $weakAreas = getStudentWeakAreas($pdo, $studentId, $currentMonth, $currentYear);
+        $recommendations = getAIRecommendations($student['student_name'], $weakAreas, $apiKey);
+        
+        // Extract recommended actions (after "💡 Recommended Actions:")
+        $recommendedAction = "";
         $recommendedActivity = "";
-    } else {
-        $recommendedAction = $recommendations;
+        
+        if (preg_match('/💡 Recommended Actions:(.*?)(?=$|\n\n|\Z)/s', $recommendations, $matches)) {
+            $recommendedAction = trim($matches[1]);
+            $recommendedActivity = "";
+        } else {
+            $recommendedAction = $recommendations;
+        }
+        
+        // Store in alerts table
+        $stmt = $pdo->prepare("
+            INSERT INTO alerts (student_id, alert_recommended_action, alert_recommended_activity, alert_status, alert_created_at) 
+            VALUES (?, ?, ?, 1, NOW())
+        ");
+        $stmt->execute([$studentId, $recommendedAction, $recommendedActivity]);
     }
-    
-    // Store in alerts table
-    $stmt = $pdo->prepare("
-        INSERT INTO alerts (student_id, alert_recommended_action, alert_recommended_activity, alert_status, alert_created_at) 
-        VALUES (?, ?, ?, 1, NOW())
-    ");
-    $stmt->execute([$studentId, $recommendedAction, $recommendedActivity]);
+    // Redirect to remove the check parameter after processing
+    header('Location: index.php');
+    exit;
 }
 
 // Fetch all valid alerts again after creation
@@ -190,6 +195,12 @@ Keep each recommendation concise but specific. Focus on practical activities tha
                 <p class="text-xs text-slate-400 hidden sm:block"><?= date('l, F d, Y') ?></p>
             </div>
         </div>
+        <a href="?check=1" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Check Students
+        </a>
     </header>
 
     <div class="flex-1 p-4 lg:p-8 space-y-6">
@@ -237,13 +248,13 @@ Keep each recommendation concise but specific. Focus on practical activities tha
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                     <div class="flex items-start justify-between mb-4">
                         <div>
-                            <h3 class="font-poppins text-lg font-semibold text-slate-800"><?= htmlspecialchars($alert['student_name']) ?></h3>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mt-1">
+                            <h3 class="font-poppins text-lg font-semibold text-slate-800"><?= htmlspecialchars($alert['student_name']) ?> <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mt-1">
                                 High Priority
-                            </span>
+                            </span></h3>
+                            
                         </div>
                         <div class="flex items-center gap-3">
-                            <a href="../students/?id=<?= $studentId ?>" class="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                            <a href="../students/?id=<?= $studentId ?>" class="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors bg-blue-500">
                                 View Student
                             </a>
                             <div class="text-right">
@@ -251,16 +262,6 @@ Keep each recommendation concise but specific. Focus on practical activities tha
                                 <p class="text-sm font-bold text-slate-600"><?= date('M d, Y', strtotime($alert['alert_created_at'])) ?></p>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-                        <p class="text-sm text-amber-800 font-medium mb-1">
-                            <?php if ($hasConsecutiveLow): ?>
-                                Development score has been below 2.5 for 2 consecutive months. Immediate intervention recommended.
-                            <?php else: ?>
-                                Development score is below 2.5. Close monitoring recommended.
-                            <?php endif; ?>
-                        </p>
                     </div>
 
                     <div class="mb-4">

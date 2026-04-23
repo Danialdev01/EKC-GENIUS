@@ -48,6 +48,18 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $existingScores[$row['assessment_id']] = $row['student_assessment_value'];
 }
 
+$stmt = $pdo->prepare("
+    SELECT * FROM ai_assessments 
+    WHERE student_id = ? AND ai_assessment_month = ? AND ai_assessment_year = ? AND ai_assessment_status = 1
+");
+$stmt->execute([$studentId, $currentMonth, $currentYear]);
+$aiAssessment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+$savedSuccess = false;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_assessment']) && !isset($_POST['save_and_next'])) {
+    $savedSuccess = true;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_assessment']) || isset($_POST['save_and_next']))) {
     $studentId = $_POST['student_id'] ?? null;
     $month = $_POST['assessment_month'] ?? null;
@@ -85,34 +97,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_assessment']) |
         $lastMonth = $month == 1 ? 12 : $month - 1;
         $lastMonthYear = $month == 1 ? $year - 1 : $year;
         
-        $stmt = $pdo->prepare("
-            SELECT sa.assessment_id, a.assessment_title, sa.student_assessment_value
-            FROM student_assessments sa
-            INNER JOIN assessments a ON a.assessment_id = sa.assessment_id
-            WHERE sa.student_id = ? AND sa.student_assessment_month = ? AND sa.student_assessment_year = ? AND sa.student_assessment_status = 1
-        ");
-        $stmt->execute([$studentId, $lastMonth, $lastMonthYear]);
-        $prevScores = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $prevScores[] = $row['assessment_title'] . ": " . $row['student_assessment_value'];
+        $allPreviousScores = [];
+        for ($i = 1; $i <= 6; $i++) {
+            $m = $month - $i;
+            $y = $year;
+            while ($m < 1) {
+                $m += 12;
+                $y -= 1;
+            }
+            if ($m <= 0) continue;
+            
+            $stmt = $pdo->prepare("
+                SELECT sa.assessment_id, a.assessment_title, sa.student_assessment_value
+                FROM student_assessments sa
+                INNER JOIN assessments a ON a.assessment_id = sa.assessment_id
+                WHERE sa.student_id = ? AND sa.student_assessment_month = ? AND sa.student_assessment_year = ? AND sa.student_assessment_status = 1
+            ");
+            $stmt->execute([$studentId, $m, $y]);
+            $scoresData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($scoresData)) {
+                $monthLabel = date('F Y', mktime(0, 0, 0, $m, 1, $y));
+                $scoresStr = [];
+                foreach ($scoresData as $row) {
+                    $scoresStr[] = $row['assessment_title'] . ": " . $row['student_assessment_value'];
+                }
+                $allPreviousScores[$monthLabel] = implode(", ", $scoresStr);
+            }
         }
         
         $stmt = $pdo->prepare("SELECT student_name FROM students WHERE student_id = ?");
         $stmt->execute([$studentId]);
         $studentName = $stmt->fetchColumn();
         
+        $previousDataStr = "";
+        foreach ($allPreviousScores as $monthLabel => $scores) {
+            $previousDataStr .= $monthLabel . " Scores: " . $scores . "\n";
+        }
+        
         $prompt = "You are an educational specialist for special needs children. Analyze the following assessment data for student {$studentName}.
 
 Current Month (" . date('F Y', mktime(0, 0, 0, $month, 1, $year)) . ") Scores:
 " . implode(", ", $currentScores) . "
 
-Previous Month (" . date('F Y', mktime(0, 0, 0, $lastMonth, 1, $lastMonthYear)) . ") Scores:
-" . (empty($prevScores) ? "No data" : implode(", ", $prevScores)) . "
+Previous Months Data:
+" . (empty($previousDataStr) ? "No previous data available" : $previousDataStr) . "
 
 Please provide your analysis in exactly this format:
 Strengths: [List the top 3 areas where the student performs well (score >= 4)]
 Focus Area: [List the top 3 areas that need improvement (score <= 2.5)]
-Trend Analysis: [Brief analysis of progress trends between months - positive or negative direction]
+Trend Analysis: [Analyze the student's current assessment pattern. Look at the previous months data to identify trends. Identify if scores are consistently low, moderately distributed, improving, declining, or showing any particular pattern across development areas over time.]
 
 Keep each section concise and specific.";
 
@@ -221,6 +254,20 @@ Keep each section concise and specific.";
                 <a href="../../teachers/students/?id=<?= (int)$studentId ?>" class="text-sm text-slate-500 hover:text-slate-700">← Back</a>
             </div>
 
+            <?php if ($savedSuccess): ?>
+            <div class="mx-6 mt-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-medium text-emerald-800">Assessment saved successfully!</p>
+                        <p class="text-xs text-emerald-600">Development Profile (AI) has been regenerated with the latest scores.</p>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <form method="post" class="p-6">
                 <input type="hidden" name="student_id" value="<?= (int)$student['student_id'] ?>">
                 <input type="hidden" name="assessment_month" value="<?= $currentMonth ?>">
@@ -248,6 +295,26 @@ Keep each section concise and specific.";
                     </div>
                     <?php endforeach; ?>
                 </div>
+
+                <?php if ($aiAssessment): ?>
+                <div class="mt-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-100">
+                    <h3 class="font-poppins text-base font-semibold text-slate-800 mb-4">Development Profile (AI)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <h4 class="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">Identified Strengths</h4>
+                            <p class="text-sm text-slate-600 leading-relaxed"><?= nl2br(htmlspecialchars($aiAssessment['ai_assessment_strengths'] ?? 'No strengths identified yet.')) ?></p>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-2">Development Focus Areas</h4>
+                            <p class="text-sm text-slate-600 leading-relaxed"><?= nl2br(htmlspecialchars($aiAssessment['ai_assessment_focus_area'] ?? 'No focus areas identified yet.')) ?></p>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">Trend Analysis</h4>
+                            <p class="text-sm text-slate-600 leading-relaxed"><?= nl2br(htmlspecialchars($aiAssessment['ai_assessment_trend_analysis'] ?? 'No trend data available.')) ?></p>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <div class="mt-6 flex gap-3">
                     <button type="submit" name="save_assessment" class="bg-indigo-600 hover:bg-indigo-700 text-white font-inter font-medium px-6 py-3 rounded-xl transition-colors">

@@ -160,6 +160,9 @@ $studentRows = $stmtS->fetchAll(PDO::FETCH_ASSOC);
                                             placeholder="Enter child's IC (e.g. 060802030010)"
                                             maxlength="12"
                                             autocomplete="off"
+                                            onkeydown="if(event.key!=='Backspace' && event.key!=='Delete' && event.key!=='ArrowLeft' && event.key!=='ArrowRight' && event.key!=='Tab' && isNaN(event.key)) event.preventDefault();"
+                                            oninput="this.value=this.value.replace(/[^0-9]/g,'');if(this.value.length>12)this.value=this.value.slice(0,12);document.getElementById('submitBtn').disabled=this.value.length<12;"
+                                            onpaste="event.preventDefault();this.value=event.clipboardData.getData('text').replace(/[^0-9]/g,'').slice(0,12);document.getElementById('submitBtn').disabled=this.value.length<12;"
                                         >
                                     </div>
                                     <p class="text-xs text-slate-400 mt-1.5">Enter IC number without dashes (-)</p>
@@ -173,11 +176,6 @@ $studentRows = $stmtS->fetchAll(PDO::FETCH_ASSOC);
                             </button>
                         </form>
 
-                        <div class="mt-4 pt-4 border-t border-slate-100 text-center">
-                            <p class="font-inter text-xs text-slate-400">
-                                Secure login • Protected by SSL
-                            </p>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -341,17 +339,12 @@ $studentRows = $stmtS->fetchAll(PDO::FETCH_ASSOC);
 
         function validateParentIC() {
             const icInput = document.getElementById('studentIcInput');
-            const ic = icInput.value.replace(/-/g, '');
+            const ic = icInput.value.replace(/[^0-9]/g, '');
             icInput.value = ic;
             return ic.length >= 12;
         }
 
-        document.getElementById('studentIcInput')?.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/-/g, '');
-            if (value.length > 12) value = value.slice(0, 12);
-            e.target.value = value;
-            document.getElementById('submitBtn').disabled = value.length < 12;
-        });
+
 
         // ── Role switcher ─────────────────────────────────────────────────────
         document.getElementById('roleSelect').addEventListener('change', function () {

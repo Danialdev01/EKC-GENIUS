@@ -118,7 +118,7 @@ $earlyWarningCount = (int) $stmt->fetchColumn();
 
         </div>
 
-        <?php include 'components/all_students.php'; ?>
+        <?php include './components/all_students.php'; ?>
 
     </div><!-- /content -->
 </main>
