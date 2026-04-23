@@ -2,7 +2,6 @@
 session_start();
 require_once '../../config/connect.php';
 require_once '../../backend/auth.php';
-require_once '../../backend/ai.php';
 requireAuth('teacher');
 $pageTitle = 'Add Assessment';
 $cssDepth = '../../public/css';
@@ -117,13 +116,23 @@ Trend Analysis: [Brief analysis of progress trends between months - positive or 
 
 Keep each section concise and specific.";
 
-        $result = callAI($prompt, 'openai/gpt-4o-mini', $apiKey);
+        require_once '../../backend/ai.php';
+        $result = null;
+        if (function_exists('callAI')) {
+            try {
+                $result = callAI($prompt, 'openai/gpt-4o-mini', $apiKey);
+            } catch (Exception $e) {
+                $result = ['success' => false];
+            }
+        } else {
+            $result = ['success' => false];
+        }
         
         $aiStrengths = "No strengths identified yet.";
         $aiFocusArea = "No focus areas identified yet.";
         $aiTrendAnalysis = "No trend data available.";
         
-        if ($result['success']) {
+        if ($result && isset($result['success']) && $result['success']) {
             $content = $result['content'];
             
             if (preg_match('/Strengths:(.*?)(?=Focus Area:|$)/s', $content, $matches)) {
@@ -165,16 +174,13 @@ Keep each section concise and specific.";
             $nextStudent = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($nextStudent) {
-                $_SESSION['success'] = 'Assessment saved!';
-                header('Location: ?student_id=' . $nextStudent['student_id'] . '&month=' . $month . '&year=' . $year);
+                header('Location: add.php?student_id=' . $nextStudent['student_id'] . '&month=' . $month . '&year=' . $year);
                 exit;
             } else {
-                $_SESSION['success'] = 'Assessment saved! No more students to assess.';
                 header('Location: ../../teachers/students/?id=' . $studentId);
                 exit;
             }
         } else {
-            $_SESSION['success'] = 'Assessment saved successfully!';
             header('Location: ../../teachers/students/?id=' . $studentId);
             exit;
         }
@@ -201,13 +207,6 @@ Keep each section concise and specific.";
     </header>
 
     <div class="flex-1 p-4 lg:p-8 space-y-6">
-        <?php if (isset($_SESSION['success'])): ?>
-        <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-            <?= htmlspecialchars($_SESSION['success']) ?>
-        </div>
-        <?php unset($_SESSION['success']); endif; ?>
-
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div class="flex items-center gap-3">
