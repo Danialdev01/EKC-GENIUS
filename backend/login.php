@@ -28,11 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $teacher_id = $_POST['teacher_id'] ?? '';
         $passkey = $_POST['passkey'] ?? '';
         
-        $env_content = file_get_contents(__DIR__ . '/../.env');
-        preg_match('/TEACHER_PASSKEY=(.+)/', $env_content, $matches);
-        $valid_passkey = trim($matches[1] ?? '');
-        
-        if ($passkey === $valid_passkey && !empty($teacher_id)) {
+        if ($passkey === $teacher_passkey && !empty($teacher_id)) {
             $stmt = $pdo->prepare("SELECT * FROM teachers WHERE teacher_id = ? AND teacher_status = 1");
             $stmt->execute([$teacher_id]);
             $teacher = $stmt->fetch(PDO::FETCH_ASSOC);
