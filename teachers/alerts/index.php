@@ -14,7 +14,7 @@ $currentYear = date('Y');
 $prevMonth = $currentMonth == 1 ? 12 : $currentMonth - 1;
 $prevYear = $currentMonth == 1 ? $currentYear - 1 : $currentYear;
 
-$apiKey = getenv('OPENROUTER_API_KEY') ?: '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';
+$apiKey = getenv('OPENROUTER_API_KEY');
 
 $oneMonthAgo = date('Y-m-d H:i:s', strtotime('-1 month'));
 

@@ -28,7 +28,7 @@ if (!$assessment) {
 }
 
 if (isset($_POST['generate_recommendation'])) {
-    $apiKey = getenv('OPENROUTER_API_KEY') ?: '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';
+    $apiKey = getenv('OPENROUTER_API_KEY');
     
     $stmt = $pdo->prepare("
         SELECT s.student_name, sa.student_assessment_value

@@ -126,7 +126,7 @@ foreach ($assessmentsList as $a) {
 $age = $student['student_year_of_birth'] ? date('Y') - (int)$student['student_year_of_birth'] . ' years old' : '—';
 
 // ── AI Assessment Generation ─────────────────────────────────────
-$apiKey = getenv('OPENROUTER_API_KEY') ?: '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';
+$apiKey = getenv('OPENROUTER_API_KEY');
 
 // Check if there's an existing AI assessment for this student for current month
 $stmt = $pdo->prepare("

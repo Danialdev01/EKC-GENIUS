@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_assessment'])) {
             }
         }
 
-        $apiKey = getenv('OPENROUTER_API_KEY') ?: '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';
+        $apiKey = getenv('OPENROUTER_API_KEY');
         
         $stmt = $pdo->query("SELECT * FROM assessments WHERE assessment_status = 1 ORDER BY assessment_title");
         $assessmentsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
