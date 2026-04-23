@@ -17,8 +17,20 @@ if (!file_exists($autoloadPath)) {
 
 require_once $autoloadPath;
 
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
-$dotenv->load();
+$knownVars = ['TEACHER_PASSKEY', 'OPENROUTER_API_KEY', 'DB_HOSTNAME', 'DB_NAME', 'DB_USERNAME', 'DB_PASSWORD'];
+foreach ($knownVars as $var) {
+    if (isset($_ENV[$var]) && strpos($_ENV[$var], '-Wl,') === 0) {
+        unset($_ENV[$var]);
+    }
+}
+
+try {
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+    $dotenv->load();
+}
+catch (\Exception $e) {
+    // Ignore load errors - vars may come from docker env vars
+}
 
 $hostname = $_ENV['DB_HOSTNAME'] ?? 'localhost';
 $dbname = $_ENV['DB_NAME'] ?? 'ekc-genius';
