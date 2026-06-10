@@ -20,7 +20,7 @@ $studentRows = $stmtS->fetchAll(PDO::FETCH_ASSOC);
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
             <a href="/" class="flex items-center gap-2 font-poppins text-xl font-bold select-none flex-shrink-0">
                 <span class="text-3xl">🎓</span>
-                <span class="text-slate-800">EKC Genius</span>
+                <span class="text-slate-800">Child Analytical System</span>
                 <span class="text-trust-600 text-xs font-normal text-slate-500">Sdn. Bhd.</span>
             </a>
 
@@ -190,9 +190,9 @@ $studentRows = $stmtS->fetchAll(PDO::FETCH_ASSOC);
                     <img src="https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=800&h=600&fit=crop" alt="Kindergarten classroom with children learning" class="w-full rounded-2xl shadow-lg object-cover">
                 </div>
                 <div class="order-1 lg:order-2">
-                    <h2 class="font-poppins text-2xl md:text-3xl font-semibold text-slate-800 mb-4">About EKC Genius</h2>
+                    <h2 class="font-poppins text-2xl md:text-3xl font-semibold text-slate-800 mb-4">About Child Analytical System</h2>
                     <p class="font-inter text-base text-slate-500 leading-relaxed mb-4">
-                        EKC Genius Sdn. Bhd. is a registered private kindergarten and childcare center located in Perak, Malaysia. Established in October 2023, we are committed to providing quality early childhood education in a nurturing and stimulating environment.
+                        Child Analytical System Sdn. Bhd. is a registered private kindergarten and childcare center located in Perak, Malaysia. Established in October 2023, we are committed to providing quality early childhood education in a nurturing and stimulating environment.
                     </p>
                     <p class="font-inter text-base text-slate-500 leading-relaxed mb-6">
                         Our programs focus on holistic development, preparing children for primary school through interactive learning approaches and modern educational technology.
@@ -244,7 +244,7 @@ $studentRows = $stmtS->fetchAll(PDO::FETCH_ASSOC);
                             <div class="w-12 h-12 rounded-full bg-trust-100 flex items-center justify-center text-xl flex-shrink-0">✉️</div>
                             <div>
                                 <h3 class="font-poppins text-base font-semibold text-slate-800 mb-1">Email</h3>
-                                <a href="mailto:info@ekcgenius.com" class="font-inter text-sm text-trust-600 hover:text-trust-700">info@ekcgenius.com</a>
+                                <a href="mailto:info@childanalyticalsystem.com" class="font-inter text-sm text-trust-600 hover:text-trust-700">info@childanalyticalsystem.com</a>
                             </div>
                         </div>
                     </div>

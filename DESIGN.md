@@ -1,4 +1,4 @@
-# EKC Genius IR4.0 — Design System & UI Specification
+# Child Analytical System IR4.0 — Design System & UI Specification
 
 > **Stack**: PHP · Tailwind CSS v3 (CLI) · Minimal vanilla JS · Google Fonts (Poppins + Inter)
 > **Philosophy**: Card-first, mobile-first, Tailwind-first. All layout, spacing, color, and typography decisions are expressed via Tailwind utility classes.
@@ -9,7 +9,7 @@
 
 | Property | Value |
 |---|---|
-| Brand Name | **EKC Genius** |
+| Brand Name | **Child Analytical System** |
 | Tagline | *Empowering Early Childhood Education with IR4.0 Technology* |
 | Personality | Innovative · Professional · Inclusive · AI-Driven |
 | Primary Market | Early childhood centers, autism centers, special education |

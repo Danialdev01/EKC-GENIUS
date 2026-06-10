@@ -4,7 +4,7 @@ Scope of the Application
 
 The application is designed for the following environments and stakeholders:
 
-- Target Institution: EKC Genius Sdn. Bhd. (EKC Genius Academy).
+- Target Institution: Child Analytical System Sdn. Bhd. (Child Analytical System Academy).
 - Primary Subjects: Children in early childhood education centers and special education programs, specifically those with autism.
 
     

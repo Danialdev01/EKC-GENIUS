@@ -17,7 +17,7 @@ $baseUrl = $role === 'admin' ? '../' : './';
     <div class="h-16 flex items-center justify-between px-5 border-b border-slate-700/60">
         <a href="<?= $baseUrl ?>index.php" class="flex items-center gap-2 font-poppins text-lg font-bold select-none">
             <span class="text-2xl">🧠</span>
-            <span class="text-slate-100">EKC</span><span class="text-indigo-400">Genius</span>
+            <span class="text-slate-100">CA </span><span class="text-indigo-400">System</span>
         </a>
         <button onclick="toggleSidebar()" class="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,6 +71,16 @@ $baseUrl = $role === 'admin' ? '../' : './';
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                 </svg>
                 Teachers
+            </a>
+
+            <!-- Admins -->
+            <?php $adminsActive = $currentDir === 'admins'; ?>
+            <a href="<?php echo $location_index?>/admin/admins/" class="nav-link group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150
+                <?= $adminsActive ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/25' : 'text-slate-400 hover:text-white hover:bg-slate-800' ?>">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+                Admins
             </a>
 
             <!-- Attendance -->

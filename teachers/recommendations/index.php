@@ -17,7 +17,7 @@ $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $perPage = 10;
 
 if (isset($_POST['load_recommendations'])) {
-    $apiKey = getenv('OPENROUTER_API_KEY');
+    $apiKey = trim((string)(getenv('OPENROUTER_API_KEY') ?: ($_ENV['OPENROUTER_API_KEY'] ?? '')));
     
     $stmt = $pdo->prepare("
         SELECT a.assessment_id, a.assessment_title, ROUND(AVG(sa.student_assessment_value), 2) as avg_score

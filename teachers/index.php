@@ -12,6 +12,15 @@ $stmt = $pdo->prepare("SELECT COUNT(*) FROM students WHERE student_status = 1");
 $stmt->execute();
 $totalStudents = (int) $stmt->fetchColumn();
 
+// ── Stats: Activities planned (active, not yet past) ─────────────────────────
+$stmt = $pdo->prepare("
+    SELECT COUNT(*) FROM activites
+    WHERE activity_status = 1
+      AND (activity_active_at IS NULL OR activity_active_at >= CURDATE())
+");
+$stmt->execute();
+$activitiesPlanned = (int) $stmt->fetchColumn();
+
 // ── Stats: Average score across all assessments this month ───────────────────
 $currentMonth = date('n');
 $currentYear  = date('Y');
@@ -43,6 +52,33 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$currentMonth, $currentYear]);
 $earlyWarningCount = (int) $stmt->fetchColumn();
+
+// ── Latest 10 active assignments ─────────────────────────────────────────────
+$stmt = $pdo->prepare("
+    SELECT a.assignment_id, a.assignment_notes, a.assignment_outcome, a.assignment_updated_at,
+           act.activity_name, act.activity_type,
+           s.student_name
+    FROM assignments a
+    LEFT JOIN activites act ON act.activity_id = a.activity_id
+    LEFT JOIN students   s   ON s.student_id   = a.student_id
+    WHERE a.assignment_status = 1
+    ORDER BY a.assignment_updated_at DESC
+    LIMIT 10
+");
+$stmt->execute();
+$latestActivities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+function timeAgo(?string $datetime): string {
+    if (!$datetime) return '—';
+    $ts = strtotime($datetime);
+    if (!$ts) return '—';
+    $diff = time() - $ts;
+    if ($diff < 60)      return 'just now';
+    if ($diff < 3600)    return floor($diff / 60) . 'm ago';
+    if ($diff < 86400)   return floor($diff / 3600) . 'h ago';
+    if ($diff < 604800)  return floor($diff / 86400) . 'd ago';
+    return date('M j, Y', $ts);
+}
 ?>
 <?php include '../components/teacher/header.php'; ?>
 
@@ -112,7 +148,7 @@ $earlyWarningCount = (int) $stmt->fetchColumn();
                 <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-2xl shrink-0">📋</div>
                 <div class="min-w-0">
                     <p class="text-xs text-slate-500 font-medium uppercase tracking-wide">Activities Planned</p>
-                    <!-- <p class="font-poppins text-3xl font-bold text-slate-800 leading-tight"><?= $activitiesPlanned ?></p> -->
+                    <p class="font-poppins text-3xl font-bold text-slate-800 leading-tight"><?= $activitiesPlanned ?></p>
                 </div>
             </div>
 

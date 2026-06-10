@@ -2,6 +2,7 @@
 session_start();
 require_once '../../config/connect.php';
 require_once '../../backend/auth.php';
+require_once '../../backend/ai_assessment.php';
 requireAuth('teacher');
 $pageTitle = 'Add Assessment';
 $cssDepth = '../../public/css';
@@ -77,116 +78,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['save_assessment']) |
             }
         }
 
-        $apiKey = getenv('OPENROUTER_API_KEY');
-        
-        $stmt = $pdo->query("SELECT * FROM assessments WHERE assessment_status = 1 ORDER BY assessment_title");
-        $assessmentsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $stmt = $pdo->prepare("
-            SELECT sa.assessment_id, a.assessment_title, sa.student_assessment_value
-            FROM student_assessments sa
-            INNER JOIN assessments a ON a.assessment_id = sa.assessment_id
-            WHERE sa.student_id = ? AND sa.student_assessment_month = ? AND sa.student_assessment_year = ? AND sa.student_assessment_status = 1
-        ");
-        $stmt->execute([$studentId, $month, $year]);
-        $currentScores = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $currentScores[] = $row['assessment_title'] . ": " . $row['student_assessment_value'];
-        }
-        
-        $lastMonth = $month == 1 ? 12 : $month - 1;
-        $lastMonthYear = $month == 1 ? $year - 1 : $year;
-        
-        $allPreviousScores = [];
-        for ($i = 1; $i <= 6; $i++) {
-            $m = $month - $i;
-            $y = $year;
-            while ($m < 1) {
-                $m += 12;
-                $y -= 1;
-            }
-            if ($m <= 0) continue;
-            
-            $stmt = $pdo->prepare("
-                SELECT sa.assessment_id, a.assessment_title, sa.student_assessment_value
-                FROM student_assessments sa
-                INNER JOIN assessments a ON a.assessment_id = sa.assessment_id
-                WHERE sa.student_id = ? AND sa.student_assessment_month = ? AND sa.student_assessment_year = ? AND sa.student_assessment_status = 1
-            ");
-            $stmt->execute([$studentId, $m, $y]);
-            $scoresData = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            if (!empty($scoresData)) {
-                $monthLabel = date('F Y', mktime(0, 0, 0, $m, 1, $y));
-                $scoresStr = [];
-                foreach ($scoresData as $row) {
-                    $scoresStr[] = $row['assessment_title'] . ": " . $row['student_assessment_value'];
-                }
-                $allPreviousScores[$monthLabel] = implode(", ", $scoresStr);
-            }
-        }
-        
-        $stmt = $pdo->prepare("SELECT student_name FROM students WHERE student_id = ?");
-        $stmt->execute([$studentId]);
-        $studentName = $stmt->fetchColumn();
-        
-        $previousDataStr = "";
-        foreach ($allPreviousScores as $monthLabel => $scores) {
-            $previousDataStr .= $monthLabel . " Scores: " . $scores . "\n";
-        }
-        
-        $prompt = "You are an educational specialist for special needs children. Analyze the following assessment data for student {$studentName}.
-
-Current Month (" . date('F Y', mktime(0, 0, 0, $month, 1, $year)) . ") Scores:
-" . implode(", ", $currentScores) . "
-
-Previous Months Data:
-" . (empty($previousDataStr) ? "No previous data available" : $previousDataStr) . "
-
-Please provide your analysis in exactly this format:
-Strengths: [List the top 3 areas where the student performs well (score >= 4)]
-Focus Area: [List the top 3 areas that need improvement (score <= 2.5)]
-Trend Analysis: [Analyze the student's current assessment pattern. Look at the previous months data to identify trends. Identify if scores are consistently low, moderately distributed, improving, declining, or showing any particular pattern across development areas over time.]
-
-Keep each section concise and specific.";
-
-        require_once '../../backend/ai.php';
-        $result = null;
-        if (function_exists('callAI')) {
-            try {
-                $result = callAI($prompt, 'openai/gpt-4o-mini', $apiKey);
-            } catch (Exception $e) {
-                $result = ['success' => false];
-            }
-        } else {
-            $result = ['success' => false];
-        }
-        
-        $aiStrengths = "No strengths identified yet.";
-        $aiFocusArea = "No focus areas identified yet.";
-        $aiTrendAnalysis = "No trend data available.";
-        
-        if ($result && isset($result['success']) && $result['success']) {
-            $content = $result['content'];
-            
-            if (preg_match('/Strengths:(.*?)(?=Focus Area:|$)/s', $content, $matches)) {
-                $aiStrengths = trim($matches[1]);
-            }
-            if (preg_match('/Focus Area:(.*?)(?=Trend Analysis:|$)/s', $content, $matches)) {
-                $aiFocusArea = trim($matches[1]);
-            }
-            if (preg_match('/Trend Analysis:(.*)/s', $content, $matches)) {
-                $aiTrendAnalysis = trim($matches[1]);
-            }
-        }
-        
-        $stmt = $pdo->prepare("UPDATE ai_assessments SET ai_assessment_status = 0 WHERE student_id = ? AND ai_assessment_month = ? AND ai_assessment_year = ?");
-        $stmt->execute([$studentId, $month, $year]);
-        
-        $stmt = $pdo->prepare("
-            INSERT INTO ai_assessments (student_id, ai_assessment_strengths, ai_assessment_focus_area, ai_assessment_trend_analysis, ai_assessment_month, ai_assessment_year, ai_assessment_status, ai_assessment_created_at)
-            VALUES (?, ?, ?, ?, ?, ?, 1, NOW())
-        ");
-        $stmt->execute([$studentId, $aiStrengths, $aiFocusArea, $aiTrendAnalysis, $month, $year]);
+        $regen = regenerateAiAssessment($pdo, (int)$studentId, (int)$month, (int)$year);
+        $aiFailed = is_array($regen) && isset($regen['error']);
+        $msg = $aiFailed
+            ? 'Assessment saved, but AI analysis failed. Click "Regenerate AI" to retry.'
+            : 'Assessment saved! Development Profile (AI) has been regenerated.';
 
         if (isset($_POST['save_and_next'])) {
             $stmt = $pdo->prepare("
@@ -207,14 +103,17 @@ Keep each section concise and specific.";
             $nextStudent = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($nextStudent) {
-                header('Location: add.php?student_id=' . $nextStudent['student_id'] . '&month=' . $month . '&year=' . $year);
+                $nextUrl = 'add.php?student_id=' . $nextStudent['student_id'] . '&month=' . $month . '&year=' . $year;
+                echo "<script>alert(" . json_encode($msg) . "); window.location.href = " . json_encode($nextUrl) . ";</script>";
                 exit;
             } else {
-                header('Location: ../../teachers/students/?id=' . $studentId);
+                $nextUrl = '../../teachers/students/?id=' . $studentId;
+                echo "<script>alert(" . json_encode($msg) . "); window.location.href = " . json_encode($nextUrl) . ";</script>";
                 exit;
             }
         } else {
-            header('Location: ../../teachers/students/?id=' . $studentId);
+            $nextUrl = '../../teachers/students/?id=' . $studentId;
+            echo "<script>alert(" . json_encode($msg) . "); window.location.href = " . json_encode($nextUrl) . ";</script>";
             exit;
         }
     }

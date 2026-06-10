@@ -15,7 +15,7 @@ $teacherName  = $_SESSION['user_name'] ?? 'Teacher';
     <div class="h-16 flex items-center justify-between px-5 border-b border-slate-700/60">
         <a href="./" class="flex items-center gap-2 font-poppins text-lg font-bold select-none">
             <span class="text-2xl">🧠</span>
-            <span class="text-slate-100">EKC</span><span class="text-indigo-400">Genius</span>
+            <span class="text-slate-100">CA </span><span class="text-indigo-400">System</span>
         </a>
         <button onclick="toggleTeacherSidebar()" class="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

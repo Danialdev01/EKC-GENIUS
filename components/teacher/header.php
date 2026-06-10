@@ -17,8 +17,8 @@ $pageTitle = $pageTitle ?? 'Dashboard';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title><?= htmlspecialchars($pageTitle) ?> | EKC Genius IR4.0</title>
-    <meta name="description" content="EKC Genius IR4.0 – Integrated platform for early childhood education management.">
+    <title><?= htmlspecialchars($pageTitle) ?> | Child Analytical System IR4.0</title>
+    <meta name="description" content="Child Analytical System IR4.0 – Integrated platform for early childhood education management.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;1,14..32,400&family=Poppins:wght@600;700&display=swap" rel="stylesheet">

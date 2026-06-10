@@ -85,7 +85,7 @@ $html = '
     <div class="header">
         <div class="header-left">
             <h1>INVOICE</h1>
-            <p>EKC Genius Learning Center</p>
+            <p>Child Analytical System Learning Center</p>
             <p>Generated on ' . date('F d, Y') . '</p>
         </div>
         <div class="header-right">
@@ -196,7 +196,7 @@ $html .= '
     
     <div class="footer">
         <p>Thank you for your business!</p>
-        <p>© ' . date('Y') . ' EKC Genius. All rights reserved.</p>
+        <p>© ' . date('Y') . ' Child Analytical System. All rights reserved.</p>
         <p>This is a computer-generated invoice. No signature required.</p>
     </div>
 </body>

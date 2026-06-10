@@ -14,7 +14,7 @@ $currentYear = date('Y');
 $prevMonth = $currentMonth == 1 ? 12 : $currentMonth - 1;
 $prevYear = $currentMonth == 1 ? $currentYear - 1 : $currentYear;
 
-$apiKey = getenv('OPENROUTER_API_KEY');
+$apiKey = trim((string)(getenv('OPENROUTER_API_KEY') ?: ($_ENV['OPENROUTER_API_KEY'] ?? '')));
 
 $oneMonthAgo = date('Y-m-d H:i:s', strtotime('-1 month'));
 
@@ -22,7 +22,7 @@ $oneMonthAgo = date('Y-m-d H:i:s', strtotime('-1 month'));
 $stmt = $pdo->prepare("UPDATE alerts SET alert_status = 2 WHERE alert_status = 1 AND alert_created_at < ?");
 $stmt->execute([$oneMonthAgo]);
 
-// Get students needing attention (avg score < 2.5 for current month)
+// Get students needing attention (avg score <= 2.4 for current month)
 $stmt = $pdo->prepare("
     SELECT s.student_id, s.student_name, ROUND(AVG(sa.student_assessment_value), 2) as avg_score
     FROM students s
@@ -30,7 +30,7 @@ $stmt = $pdo->prepare("
     WHERE sa.student_assessment_month = ? AND sa.student_assessment_year = ?
       AND s.student_status = 1
     GROUP BY s.student_id, s.student_name
-    HAVING avg_score < 2.5
+    HAVING avg_score <= 2.4
     ORDER BY avg_score ASC
 ");
 $stmt->execute([$currentMonth, $currentYear]);
@@ -212,7 +212,7 @@ Keep each recommendation concise but specific. Focus on practical activities tha
                     <p class="text-xs text-slate-500 font-medium uppercase">Students Need Attention</p>
                 </div>
                 <p class="font-poppins text-3xl font-bold text-slate-800"><?= $needAttentionCount ?></p>
-                <p class="text-xs text-slate-400 mt-1">Avg score below 2.5</p>
+                <p class="text-xs text-slate-400 mt-1">Avg score 2.4 and below</p>
             </div>
 
             <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
@@ -242,7 +242,7 @@ Keep each recommendation concise but specific. Focus on practical activities tha
                 <?php 
                 $studentId = $alert['student_id'];
                 $weakAreas = getStudentWeakAreas($pdo, $studentId, $currentMonth, $currentYear);
-                $hasConsecutiveLow = isset($prevMonthScores[$studentId]) && $prevMonthScores[$studentId] < 2.5;
+                $hasConsecutiveLow = isset($prevMonthScores[$studentId]) && $prevMonthScores[$studentId] <= 2.4;
                 $weakAreasList = array_slice($weakAreas, 0, 7);
                 ?>
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
@@ -287,7 +287,7 @@ Keep each recommendation concise but specific. Focus on practical activities tha
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
             <div class="text-4xl mb-4">✅</div>
             <h3 class="font-poppins text-lg font-semibold text-slate-800 mb-2">All Students Doing Well</h3>
-            <p class="text-slate-500">No students currently need attention. All development scores are above 2.5.</p>
+            <p class="text-slate-500">No students currently need attention. All development scores are 2.5 or above.</p>
         </div>
         <?php endif; ?>
     </div>

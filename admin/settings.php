@@ -134,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_passkey'])) {
             <div class="p-6 space-y-3">
                 <div class="flex justify-between">
                     <span class="text-sm text-slate-500">Application</span>
-                    <span class="text-sm font-medium text-slate-800">EKC Genius</span>
+                    <span class="text-sm font-medium text-slate-800">Child Analytical System</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-sm text-slate-500">Version</span>

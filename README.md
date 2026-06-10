@@ -1,11 +1,11 @@
-# EKC Genius IR4.0 Platform
+# Child Analytical System IR4.0 Platform
 
 An integrated **IR4.0 platform** leveraging **Mathematical Analytics** and **Artificial Intelligence** to modernize management, intervention, and inclusive education for early childhood centers, specifically for students with autism.
 
 ---
 
 ## 📌 Overview
-Developed in collaboration between **Universiti Pendidikan Sultan Idris (UPSI)** and **EKC Genius Sdn. Bhd.**, this system transitions manual educational processes into a digital ecosystem. It focuses on identifying student strengths and weaknesses through data-driven insights to provide timely early interventions.
+Developed in collaboration between **Universiti Pendidikan Sultan Idris (UPSI)** and **Child Analytical System Sdn. Bhd.**, this system transitions manual educational processes into a digital ecosystem. It focuses on identifying student strengths and weaknesses through data-driven insights to provide timely early interventions.
 
 ## ⚠️ Problem Statement
 *   **Manual Records:** Learning progress and operations are currently recorded manually, leading to inefficiency and data silos.
@@ -57,5 +57,5 @@ The system utilizes core mathematical elements to ensure data accuracy and objec
 ## 👥 Project Team
 *   **Lead Researcher:** Dr. Adib Bin Mashuri (UPSI)
 *   **Developer:** Danial Irfan Bin Zakaria
-*   **Industry Partner:** EKC Genius Sdn. Bhd.
+*   **Industry Partner:** Child Analytical System Sdn. Bhd.
 ---

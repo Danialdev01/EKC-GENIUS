@@ -4,7 +4,7 @@
                 <div>
                     <div class="flex items-center gap-2 mb-4">
                         <span class="text-2xl">🎓</span>
-                        <h3 class="text-xl font-bold font-[Poppins,sans-serif]">EKC Genius Sdn. Bhd.</h3>
+                        <h3 class="text-xl font-bold font-[Poppins,sans-serif]">Child Analytical System Sdn. Bhd.</h3>
                     </div>
                     <p class="text-[#94A3B8] text-xs mb-2">Registration No.: 202301042423</p>
                     <p class="text-[#94A3B8] text-xs mb-4">Incorporated: October 25, 2023 | Perak, Malaysia</p>
@@ -18,7 +18,7 @@
                     <ul class="space-y-2 text-sm text-[#94A3B8]">
                         <li>📍 Perak, Malaysia</li>
                         <li>📞 <a href="tel:+60123456789" class="hover:text-[#6366F1] transition-colors">+60 12 345 6789</a></li>
-                        <li>✉️ <a href="mailto:info@ekcgenius.com" class="hover:text-[#6366F1] transition-colors">info@ekcgenius.com</a></li>
+                        <li>✉️ <a href="mailto:info@childanalyticalsystem.com" class="hover:text-[#6366F1] transition-colors">info@childanalyticalsystem.com</a></li>
                     </ul>
                 </div>
             </div>
@@ -27,7 +27,7 @@
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div class="text-center md:text-left">
                         <p class="text-sm text-[#94A3B8]">
-                            &copy; <?= date('Y') ?> <span class="text-[#FAFBFC]">EKC Genius Sdn. Bhd.</span> (202301042423) All rights reserved.
+                            &copy; <?= date('Y') ?> <span class="text-[#FAFBFC]">Child Analytical System Sdn. Bhd.</span> (202301042423) All rights reserved.
                         </p>
                         <p class="text-xs text-[#64748B] mt-1">
                             Developed in collaboration with Universiti Pendidikan Sultan Idris (UPSI)

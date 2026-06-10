@@ -1,6 +1,6 @@
 <?php
 /**
- * EKC Genius – Auth Guard
+ * Child Analytical System – Auth Guard
  *
  * Usage (at the top of any protected page):
  *   require_once __DIR__ . '/../backend/auth.php';

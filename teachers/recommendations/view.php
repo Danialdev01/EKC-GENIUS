@@ -28,7 +28,7 @@ if (!$assessment) {
 }
 
 if (isset($_POST['generate_recommendation'])) {
-    $apiKey = getenv('OPENROUTER_API_KEY');
+    $apiKey = trim((string)(getenv('OPENROUTER_API_KEY') ?: ($_ENV['OPENROUTER_API_KEY'] ?? '')));
     
     $stmt = $pdo->prepare("
         SELECT s.student_name, sa.student_assessment_value

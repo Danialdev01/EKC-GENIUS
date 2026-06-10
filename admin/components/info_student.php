@@ -113,6 +113,26 @@ $age = $student['student_year_of_birth'] ? date('Y') - (int)$student['student_ye
 
 $hasNotes = !empty(trim($student['student_notes'] ?? ''));
 $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
+
+// ── AI Assessment (read most recent active row, lazy-generate if none) ──────────
+$stmt = $pdo->prepare("
+    SELECT * FROM ai_assessments
+    WHERE student_id = ? AND ai_assessment_status = 1
+    ORDER BY ai_assessment_year DESC, ai_assessment_month DESC, ai_assessment_id DESC
+    LIMIT 1
+");
+$stmt->execute([$studentId]);
+$existingAI = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$existingAI) {
+    require_once '../../backend/ai_assessment.php';
+    $regen = regenerateAiAssessment($pdo, $studentId, $currentMonthNum, $currentYearNum);
+    if (is_array($regen) && !isset($regen['error'])) {
+        $existingAI = $regen;
+    }
+}
+
+$aiAnalysis = $existingAI ?? null;
 ?>
 
 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
@@ -165,9 +185,9 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
                 <a href="<?php echo $location_index?>/admin/pdf/student_report.php?id=<?= (int)$studentId ?>" target="_blank" class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">
                     <span>📄</span> Download Report
                 </a>
-                <a href="<?php echo $location_index?>/teachers/assessments/add.php?student_id=<?= (int)$studentId ?>" class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                <!-- <a href="<?php echo $location_index?>/teachers/assessments/add.php?student_id=<?= (int)$studentId ?>" class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
                     <span>📝</span> Add Assessment
-                </a>
+                </a> -->
                 <button onclick="openNotesModal()" class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium <?= $hasNotes ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-slate-50 text-slate-700 hover:bg-slate-100' ?> transition-colors">
                     <span>📋</span> <?= $notesButtonText ?>
                 </button>
@@ -226,34 +246,64 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
 </div>
 
 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
-    <h3 class="font-poppins text-lg font-semibold text-slate-800 mb-4">Development Profile</h3>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <h3 class="font-poppins text-lg font-semibold text-slate-800">Development Profile</h3>
+        <button type="button" id="regen-ai-btn"
+            data-student-id="<?= (int)$studentId ?>"
+            data-month="<?= (int)$currentMonthNum ?>"
+            data-year="<?= (int)$currentYearNum ?>"
+            data-endpoint="<?= $location_index ?>/../backend/api/regenerate_ai.php"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors shrink-0 <?= empty($aiAnalysis) ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50' ?>">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span id="regen-ai-label"><?= empty($aiAnalysis) ? 'Generate AI Analysis' : 'Regenerate AI' ?></span>
+        </button>
+    </div>
     <div class="flex flex-col lg:flex-row items-center gap-8">
         <div class="w-full max-w-md">
             <canvas id="radarChart"></canvas>
         </div>
-        
-        <div class="flex-1 space-y-4">
-            <div class="p-4 bg-slate-50 rounded-xl">
-                <h4 class="text-sm font-semibold text-slate-700 mb-2">Identified Strengths (AI)</h4>
-                <p class="text-sm text-slate-600">
-                    Strong performance in Communication Skill, Social Interaction, and Eye Contact. 
-                    These are key developmental strengths for <?= htmlspecialchars($student['student_name']) ?>.
+
+        <div class="flex-1 space-y-4" id="ai-panel">
+            <?php if ($aiAnalysis):
+                $aiPeriod = date('F Y', mktime(0, 0, 0, (int)$aiAnalysis['ai_assessment_month'], 1, (int)$aiAnalysis['ai_assessment_year']));
+            ?>
+            <div id="ai-cards">
+                <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <h4 class="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                        Identified Strengths (AI)
+                        <span id="ai-period" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><?= htmlspecialchars($aiPeriod) ?></span>
+                    </h4>
+                    <p id="ai-strengths" class="text-sm text-emerald-700"><?= nl2br(htmlspecialchars($aiAnalysis['ai_assessment_strengths'] ?? '')) ?></p>
+                </div>
+                <div class="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                    <h4 class="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                        Development Focus Areas (AI)
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"><?= htmlspecialchars($aiPeriod) ?></span>
+                    </h4>
+                    <p id="ai-focus" class="text-sm text-amber-700"><?= nl2br(htmlspecialchars($aiAnalysis['ai_assessment_focus_area'] ?? '')) ?></p>
+                </div>
+                <div class="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <h4 class="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                        Trend Analysis (AI)
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700"><?= htmlspecialchars($aiPeriod) ?></span>
+                    </h4>
+                    <p id="ai-trend" class="text-sm text-blue-700"><?= nl2br(htmlspecialchars($aiAnalysis['ai_assessment_trend_analysis'] ?? '')) ?></p>
+                </div>
+            </div>
+            <?php else: ?>
+            <div id="ai-fallback" class="p-4 bg-slate-50 rounded-xl">
+                <h4 class="text-sm font-semibold text-slate-700 mb-2">AI Analysis</h4>
+                <p class="text-sm text-slate-500">
+                    <?php if (empty($scores)): ?>
+                        No AI assessment available. Save an assessment to generate the development profile.
+                    <?php else: ?>
+                        AI analysis could not be generated. Click "Generate AI Analysis" to try again.
+                    <?php endif; ?>
                 </p>
             </div>
-            <div class="p-4 bg-slate-50 rounded-xl">
-                <h4 class="text-sm font-semibold text-slate-700 mb-2">Development Focus Areas (AI)</h4>
-                <p class="text-sm text-slate-600">
-                    Attention and Focus, Emotional Regulation, and Motor Coordination. 
-                    These areas require targeted intervention to support overall development.
-                </p>
-            </div>
-            <div class="p-4 bg-slate-50 rounded-xl">
-                <h4 class="text-sm font-semibold text-slate-700 mb-2">Trend Analysis (AI)</h4>
-                <p class="text-sm text-slate-600">
-                    <?= htmlspecialchars($student['student_name']) ?> has shown a positive trend in Communication Skill, 
-                    with a 15% improvement over the last quarter. However, there is a slight decline in Motor Coordination.
-                </p>
-            </div>
+            <?php endif; ?>
             <div class="p-4 bg-slate-50 rounded-xl">
                 <h4 class="text-sm font-semibold text-slate-700 mb-2">Additional Notes (Teacher)</h4>
                 <?php if ($hasNotes): ?>
@@ -265,6 +315,67 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var btn = document.getElementById('regen-ai-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+        var studentId = btn.getAttribute('data-student-id');
+        var month     = btn.getAttribute('data-month');
+        var year      = btn.getAttribute('data-year');
+        var endpoint  = btn.getAttribute('data-endpoint');
+        var label     = document.getElementById('regen-ai-label');
+        var originalLabel = label ? label.textContent : btn.textContent;
+        if (label) label.textContent = 'Regenerating…';
+        btn.disabled = true;
+        btn.classList.add('opacity-60', 'cursor-not-allowed');
+
+        var fd = new FormData();
+        fd.append('student_id', studentId);
+        fd.append('month', month);
+        fd.append('year', year);
+
+        function esc(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        function setLines(id, text) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = esc(text).split('\n').join('<br>');
+        }
+
+        fetch(endpoint, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j.success) {
+                    throw new Error(j.message || j.error || 'unknown error');
+                }
+                if (document.getElementById('ai-fallback')) {
+                    location.reload();
+                    return;
+                }
+                setLines('ai-strengths', j.data.strengths);
+                setLines('ai-focus',      j.data.focus_area);
+                setLines('ai-trend',      j.data.trend_analysis);
+                var p = document.getElementById('ai-period');
+                if (p) p.innerText = j.data.period;
+                if (label) {
+                    label.textContent = '✓ Updated';
+                    setTimeout(function () { label.textContent = originalLabel; }, 1500);
+                }
+            })
+            .catch(function (e) {
+                alert('AI regeneration failed: ' + e.message);
+                if (label) label.textContent = originalLabel;
+            })
+            .finally(function () {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60', 'cursor-not-allowed');
+            });
+    });
+})();
+</script>
 
 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
     <h3 class="font-poppins text-lg font-semibold text-slate-800 mb-4">Predictive Development Analytics</h3>
@@ -311,7 +422,7 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
                     <th class="px-2 py-2 text-xs font-semibold text-slate-500 uppercase text-center"><?= htmlspecialchars($a['assessment_icon']) ?></th>
                     <?php endforeach; ?>
                     <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase text-center">Average</th>
-                    <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase text-center">Edit</th>
+                    <!-- <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase text-center">Edit</th> -->
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100" id="historyTableBody">
@@ -340,9 +451,9 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
                     <td class="px-2 py-3 text-center text-sm <?= !$s ? 'text-slate-400' : '' ?>"><?= $s ?? '—' ?></td>
                     <?php endforeach; ?>
                     <td class="px-3 py-3 text-center text-sm font-semibold <?= $monthAvg ? 'text-indigo-600' : 'text-slate-400' ?>"><?= $monthAvg ?? '—' ?></td>
-                    <td class="px-3 py-3 text-center">
+                    <!-- <td class="px-3 py-3 text-center">
                         <button class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Edit</button>
-                    </td>
+                    </td> -->
                 </tr>
                 <?php } ?>
             </tbody>
@@ -350,7 +461,7 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
     </div>
 </div>
 
-<div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+<!-- <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
     <h3 class="font-poppins text-lg font-semibold text-slate-800 mb-4">Record Assessment (<?= date('F Y') ?>)</h3>
     <form method="post" class="space-y-4">
         <input type="hidden" name="student_id" value="<?= (int)$studentId ?>">
@@ -387,7 +498,7 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
             </button>
         </div>
     </form>
-</div>
+</div> -->
 
 <script>
 function filterHistory() {
@@ -431,7 +542,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_assessment'])) {
             }
         }
 
-        echo "<script>alert('Assessment saved!'); window.location.href = '?id=$sid';</script>";
+        require_once '../../backend/ai_assessment.php';
+        $regen = regenerateAiAssessment($pdo, (int)$sid, (int)$month, (int)$year);
+        $aiFailed = is_array($regen) && isset($regen['error']);
+        $msg = $aiFailed
+            ? 'Assessment saved, but AI analysis failed. Click "Regenerate AI" to retry.'
+            : 'Assessment saved! Development Profile (AI) has been regenerated.';
+        echo "<script>alert(" . json_encode($msg) . "); window.location.href = '?id=$sid';</script>";
     }
 }
 ?>

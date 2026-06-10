@@ -126,95 +126,23 @@ foreach ($assessmentsList as $a) {
 $age = $student['student_year_of_birth'] ? date('Y') - (int)$student['student_year_of_birth'] . ' years old' : '—';
 
 // ── AI Assessment Generation ─────────────────────────────────────
-$apiKey = getenv('OPENROUTER_API_KEY');
 
-// Check if there's an existing AI assessment for this student for current month
+// Fetch the most recent active AI assessment for this student (any month)
 $stmt = $pdo->prepare("
-    SELECT * FROM ai_assessments 
-    WHERE student_id = ? AND ai_assessment_month = ? AND ai_assessment_year = ? AND ai_assessment_status = 1
+    SELECT * FROM ai_assessments
+    WHERE student_id = ? AND ai_assessment_status = 1
+    ORDER BY ai_assessment_year DESC, ai_assessment_month DESC, ai_assessment_id DESC
+    LIMIT 1
 ");
-$stmt->execute([$studentId, $currentMonth, $currentYear]);
+$stmt->execute([$studentId]);
 $existingAI = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$existingAI && !empty($scores)) {
-    require_once '../../backend/ai.php';
-    
-    // Get all assessment scores for context
-    $scoreDetails = [];
-    foreach ($assessmentsList as $a) {
-        if (isset($scores[$a['assessment_id']])) {
-            $scoreDetails[] = $a['assessment_title'] . ": " . $scores[$a['assessment_id']];
-        }
+if (!$existingAI) {
+    require_once '../../backend/ai_assessment.php';
+    $regen = regenerateAiAssessment($pdo, $studentId, $currentMonth, $currentYear);
+    if (is_array($regen) && !isset($regen['error'])) {
+        $existingAI = $regen;
     }
-    
-    // Get previous month scores for trend
-    $stmt = $pdo->prepare("
-        SELECT sa.assessment_id, sa.student_assessment_value
-        FROM student_assessments sa
-        WHERE sa.student_id = ? AND sa.student_assessment_month = ? AND sa.student_assessment_year = ? AND sa.student_assessment_status = 1
-    ");
-    $stmt->execute([$studentId, $lastMonthNum, $lastMonthYear]);
-    $prevScores = [];
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $prevScores[$row['assessment_id']] = $row['student_assessment_value'];
-    }
-    
-    $prevScoreDetails = [];
-    foreach ($assessmentsList as $a) {
-        if (isset($prevScores[$a['assessment_id']])) {
-            $prevScoreDetails[] = $a['assessment_title'] . ": " . $prevScores[$a['assessment_id']];
-        }
-    }
-    
-    $prompt = "You are an educational specialist for special needs children. Analyze the following assessment data for student {$student['student_name']}.
-
-Current Month (" . date('F Y') . ") Scores:
-" . implode(", ", $scoreDetails) . "
-
-Previous Month (" . date('F Y', strtotime("-1 month")) . ") Scores:
-" . (empty($prevScoreDetails) ? "No data" : implode(", ", $prevScoreDetails)) . "
-
-Please provide your analysis in exactly this format:
-Strengths: [List the top 3 areas where the student performs well (score >= 4)]
-Focus Area: [List the top 3 areas that need improvement (score <= 2.5)]
-Trend Analysis: [Brief analysis of progress trends between months - positive or negative direction]
-
-Keep each section concise and specific.";
-
-    $result = callAI($prompt, 'openai/gpt-4o-mini', $apiKey);
-    
-    $aiStrengths = "No strengths identified yet.";
-    $aiFocusArea = "No focus areas identified yet.";
-    $aiTrendAnalysis = "No trend data available.";
-    
-    if ($result['success']) {
-        $content = $result['content'];
-        
-        if (preg_match('/Strengths:(.*?)(?=Focus Area:|$)/s', $content, $matches)) {
-            $aiStrengths = trim($matches[1]);
-        }
-        if (preg_match('/Focus Area:(.*?)(?=Trend Analysis:|$)/s', $content, $matches)) {
-            $aiFocusArea = trim($matches[1]);
-        }
-        if (preg_match('/Trend Analysis:(.*)/s', $content, $matches)) {
-            $aiTrendAnalysis = trim($matches[1]);
-        }
-    }
-    
-    // Store in ai_assessments table
-    $stmt = $pdo->prepare("
-        INSERT INTO ai_assessments (student_id, ai_assessment_strengths, ai_assessment_focus_area, ai_assessment_trend_analysis, ai_assessment_month, ai_assessment_year, ai_assessment_status, ai_assessment_created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 1, NOW())
-    ");
-    $stmt->execute([$studentId, $aiStrengths, $aiFocusArea, $aiTrendAnalysis, $currentMonth, $currentYear]);
-    
-    // Fetch the newly created record
-    $stmt = $pdo->prepare("
-        SELECT * FROM ai_assessments 
-        WHERE student_id = ? AND ai_assessment_month = ? AND ai_assessment_year = ? AND ai_assessment_status = 1
-    ");
-    $stmt->execute([$studentId, $currentMonth, $currentYear]);
-    $existingAI = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 $aiAnalysis = $existingAI ?? null;
@@ -412,38 +340,62 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
 
 <!-- Development Profile - Radar Chart -->
 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
-    <h3 class="font-poppins text-lg font-semibold text-slate-800 mb-4">Development Profile</h3>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <h3 class="font-poppins text-lg font-semibold text-slate-800">Development Profile</h3>
+        <button type="button" id="regen-ai-btn"
+            data-student-id="<?= (int)$studentId ?>"
+            data-month="<?= (int)$currentMonth ?>"
+            data-year="<?= (int)$currentYear ?>"
+            data-endpoint="<?= $location_index ?>/../backend/api/regenerate_ai.php"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors shrink-0 <?= empty($aiAnalysis) ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'border border-indigo-200 text-indigo-600 hover:bg-indigo-50' ?>">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span id="regen-ai-label"><?= empty($aiAnalysis) ? 'Generate AI Analysis' : 'Regenerate AI' ?></span>
+        </button>
+    </div>
     <div class="flex flex-col lg:flex-row items-center gap-8">
         <div class="w-full max-w-md">
             <canvas id="radarChart"></canvas>
         </div>
-        
+
         <!-- AI Development Analysis -->
-        <div class="flex-1 space-y-4">
-            <?php if ($aiAnalysis): ?>
-            <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                <h4 class="text-sm font-semibold text-emerald-800 mb-2">Identified Strengths (AI)</h4>
-                <p class="text-sm text-emerald-700">
-                    <?= htmlspecialchars($aiAnalysis['ai_assessment_strengths']) ?>
-                </p>
-            </div>
-            <div class="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                <h4 class="text-sm font-semibold text-amber-800 mb-2">Development Focus Areas (AI)</h4>
-                <p class="text-sm text-amber-700">
-                    <?= htmlspecialchars($aiAnalysis['ai_assessment_focus_area']) ?>
-                </p>
-            </div>
-            <div class="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                <h4 class="text-sm font-semibold text-blue-800 mb-2">Trend Analysis (AI)</h4>
-                <p class="text-sm text-blue-700">
-                    <?= htmlspecialchars($aiAnalysis['ai_assessment_trend_analysis']) ?>
-                </p>
+        <div class="flex-1 space-y-4" id="ai-panel">
+            <?php if ($aiAnalysis):
+                $aiPeriod = date('F Y', mktime(0, 0, 0, (int)$aiAnalysis['ai_assessment_month'], 1, (int)$aiAnalysis['ai_assessment_year']));
+            ?>
+            <div id="ai-cards">
+                <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <h4 class="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                        Identified Strengths (AI)
+                        <span id="ai-period" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><?= htmlspecialchars($aiPeriod) ?></span>
+                    </h4>
+                    <p id="ai-strengths" class="text-sm text-emerald-700"><?= nl2br(htmlspecialchars($aiAnalysis['ai_assessment_strengths'])) ?></p>
+                </div>
+                <div class="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                    <h4 class="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                        Development Focus Areas (AI)
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"><?= htmlspecialchars($aiPeriod) ?></span>
+                    </h4>
+                    <p id="ai-focus" class="text-sm text-amber-700"><?= nl2br(htmlspecialchars($aiAnalysis['ai_assessment_focus_area'])) ?></p>
+                </div>
+                <div class="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <h4 class="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                        Trend Analysis (AI)
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700"><?= htmlspecialchars($aiPeriod) ?></span>
+                    </h4>
+                    <p id="ai-trend" class="text-sm text-blue-700"><?= nl2br(htmlspecialchars($aiAnalysis['ai_assessment_trend_analysis'])) ?></p>
+                </div>
             </div>
             <?php else: ?>
-            <div class="p-4 bg-slate-50 rounded-xl">
+            <div id="ai-fallback" class="p-4 bg-slate-50 rounded-xl">
                 <h4 class="text-sm font-semibold text-slate-700 mb-2">AI Analysis</h4>
                 <p class="text-sm text-slate-500">
-                    No AI assessment available. Please add student assessments to generate AI analysis.
+                    <?php if (empty($scores)): ?>
+                        No AI assessment available. Save an assessment to generate the development profile.
+                    <?php else: ?>
+                        AI analysis could not be generated. Click "Generate AI Analysis" to try again.
+                    <?php endif; ?>
                 </p>
             </div>
             <?php endif; ?>
@@ -458,6 +410,67 @@ $notesButtonText = $hasNotes ? 'Edit Notes' : 'Add Notes';
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var btn = document.getElementById('regen-ai-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+        var studentId = btn.getAttribute('data-student-id');
+        var month     = btn.getAttribute('data-month');
+        var year      = btn.getAttribute('data-year');
+        var endpoint  = btn.getAttribute('data-endpoint');
+        var label     = document.getElementById('regen-ai-label');
+        var originalLabel = label ? label.textContent : btn.textContent;
+        if (label) label.textContent = 'Regenerating…';
+        btn.disabled = true;
+        btn.classList.add('opacity-60', 'cursor-not-allowed');
+
+        var fd = new FormData();
+        fd.append('student_id', studentId);
+        fd.append('month', month);
+        fd.append('year', year);
+
+        function esc(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        function setLines(id, text) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = esc(text).split('\n').join('<br>');
+        }
+
+        fetch(endpoint, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j.success) {
+                    throw new Error(j.message || j.error || 'unknown error');
+                }
+                if (document.getElementById('ai-fallback')) {
+                    location.reload();
+                    return;
+                }
+                setLines('ai-strengths', j.data.strengths);
+                setLines('ai-focus',      j.data.focus_area);
+                setLines('ai-trend',      j.data.trend_analysis);
+                var p = document.getElementById('ai-period');
+                if (p) p.innerText = j.data.period;
+                if (label) {
+                    label.textContent = '✓ Updated';
+                    setTimeout(function () { label.textContent = originalLabel; }, 1500);
+                }
+            })
+            .catch(function (e) {
+                alert('AI regeneration failed: ' + e.message);
+                if (label) label.textContent = originalLabel;
+            })
+            .finally(function () {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60', 'cursor-not-allowed');
+            });
+    });
+})();
+</script>
 
 <!-- Predictive Development Analytics -->
 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
@@ -594,9 +607,10 @@ function selectScore(assessmentId, value) {
 <script>
 const ctx = document.getElementById('radarChart').getContext('2d');
 const labels = <?= json_encode(array_column($assessmentsList, 'assessment_title')) ?>;
-const data = <?php 
+const data = <?php
 $scoreData = [];
-foreach ($assessmentsList as $a) { $scoreData[] = $scores[$a['assessment_id']] ?? 0; }
+$radarFallback = $avgScore ?? 0;
+foreach ($assessmentsList as $a) { $scoreData[] = $scores[$a['assessment_id']] ?? $radarFallback; }
 echo json_encode($scoreData);
 ?>;
 
